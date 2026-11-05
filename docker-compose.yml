@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-blog}
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Disposable database for npm test. Data is lost when the container stops.
+  db-test:
+    image: postgres:17-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: blog_test
+    ports:
+      - '5434:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d blog_test']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    environment:
+      PORT: 3000
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      BLOG_CUSTOMER_WRITES_ENABLED: ${BLOG_CUSTOMER_WRITES_ENABLED:-true}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-blog}
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+    # Apply pending migrations, then hand over to node so it receives SIGTERM directly.
+    command: sh -c "node dist/db/migrate.js && exec node dist/index.js"
+
+volumes:
+  db-data:

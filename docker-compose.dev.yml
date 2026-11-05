@@ -1,0 +1,30 @@
+# Development overrides. Start with: npm run docker:watch
+services:
+  api:
+    build:
+      context: .
+      target: dev
+    environment:
+      NODE_ENV: development
+    command: sh -c "npm run db:migrate && exec npm run dev"
+    develop:
+      watch:
+        # Copied into the container, where tsx watch reloads the app.
+        - action: sync
+          path: ./src
+          target: /app/src
+        # New migrations need the startup migration step to run again.
+        - action: sync+restart
+          path: ./drizzle
+          target: /app/drizzle
+        # Dependency changes need a fresh npm ci.
+        - action: rebuild
+          path: package-lock.json
+
+  # Database browser at http://localhost:8081, reachable only from this machine.
+  adminer:
+    image: adminer:5
+    ports:
+      - '127.0.0.1:8081:8080'
+    depends_on:
+      - db
