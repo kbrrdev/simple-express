@@ -39,7 +39,6 @@ services:
       PORT: 3000
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      BLOG_CUSTOMER_WRITES_ENABLED: ${BLOG_CUSTOMER_WRITES_ENABLED:-true}
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-blog}
     ports:
       - '${PORT:-3000}:3000'

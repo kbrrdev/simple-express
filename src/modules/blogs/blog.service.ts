@@ -4,8 +4,6 @@ import { AppError } from '../../lib/app-error';
 import { blogs, type Blog } from './blog.schema';
 import type { CreateBlogBody, ListBlogsQuery, UpdateBlogBody } from './blog.validation';
 
-type BlogWriter = { userId: string; role: 'customer' | 'admin' };
-
 export async function listBlogs({ page, limit, published }: ListBlogsQuery) {
   const where = published === undefined ? undefined : eq(blogs.published, published);
 
@@ -28,39 +26,20 @@ export async function getBlog(id: string): Promise<Blog> {
   return blog ?? notFound(id);
 }
 
-export async function createBlog(data: CreateBlogBody, authorId: string): Promise<Blog> {
-  const [blog] = await db
-    .insert(blogs)
-    .values({ ...data, authorId })
-    .returning();
+export async function createBlog(data: CreateBlogBody): Promise<Blog> {
+  const [blog] = await db.insert(blogs).values(data).returning();
   if (!blog) throw new AppError(500, 'Failed to create blog');
   return blog;
 }
 
-export async function updateBlog(
-  id: string,
-  data: UpdateBlogBody,
-  writer: BlogWriter,
-): Promise<Blog> {
-  await assertCanChange(id, writer);
-
+export async function updateBlog(id: string, data: UpdateBlogBody): Promise<Blog> {
   const [blog] = await db.update(blogs).set(data).where(eq(blogs.id, id)).returning();
   return blog ?? notFound(id);
 }
 
-export async function deleteBlog(id: string, writer: BlogWriter): Promise<void> {
-  await assertCanChange(id, writer);
-
+export async function deleteBlog(id: string): Promise<void> {
   const [blog] = await db.delete(blogs).where(eq(blogs.id, id)).returning({ id: blogs.id });
   if (!blog) notFound(id);
-}
-
-async function assertCanChange(id: string, { userId, role }: BlogWriter) {
-  const blog = await getBlog(id);
-
-  if (role !== 'admin' && blog.authorId !== userId) {
-    throw new AppError(403, 'You can only change your own blogs');
-  }
 }
 
 function notFound(id: string): never {

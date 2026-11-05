@@ -50,6 +50,13 @@
       "when": 1793904632221,
       "tag": "0006_create_addresses",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793905654684,
+      "tag": "0007_remove_blog_author",
+      "breakpoints": true
     }
   ]
 }

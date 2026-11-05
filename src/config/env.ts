@@ -9,7 +9,6 @@ interface Env {
   DATABASE_URL: string;
   CORS_ORIGINS: string[];
   JWT_SECRET: string;
-  BLOG_CUSTOMER_WRITES_ENABLED: boolean;
 }
 
 const isOrigin = (value: string) => URL.canParse(value) && new URL(value).origin === value;
@@ -32,7 +31,6 @@ const envSchema = Joi.object<Env>({
     .required(),
   CORS_ORIGINS: Joi.string().empty('').default([]).custom(parseOrigins),
   JWT_SECRET: Joi.string().min(32).required(),
-  BLOG_CUSTOMER_WRITES_ENABLED: Joi.boolean().empty('').default(true),
 }).unknown();
 
 const { error, value } = envSchema.validate(process.env, { abortEarly: false });

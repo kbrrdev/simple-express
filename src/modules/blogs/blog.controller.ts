@@ -20,15 +20,15 @@ export async function get(req: Request<IdParams>, res: Response) {
 }
 
 export async function create(req: Request<object, object, CreateBlogBody>, res: Response) {
-  const blog = await blogService.createBlog(req.body, res.locals.auth.userId);
+  const blog = await blogService.createBlog(req.body);
   res.status(201).location(`${req.baseUrl}/${blog.id}`).json({ data: blog });
 }
 
 export async function update(req: Request<IdParams, object, UpdateBlogBody>, res: Response) {
-  res.json({ data: await blogService.updateBlog(req.params.id, req.body, res.locals.auth) });
+  res.json({ data: await blogService.updateBlog(req.params.id, req.body) });
 }
 
 export async function remove(req: Request<IdParams>, res: Response) {
-  await blogService.deleteBlog(req.params.id, res.locals.auth);
+  await blogService.deleteBlog(req.params.id);
   res.status(204).send();
 }
