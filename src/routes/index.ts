@@ -3,16 +3,20 @@ import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { db } from '../db';
 import { openApiDocument } from '../docs/openapi';
+import { addressRoutes } from '../modules/addresses/address.routes';
 import { authRoutes } from '../modules/auth/auth.routes';
 import { blogRoutes } from '../modules/blogs/blog.routes';
+import { cartRoutes } from '../modules/cart/cart.routes';
 import { categoryRoutes } from '../modules/categories/category.routes';
 import { productRoutes } from '../modules/products/product.routes';
 
 const apiRoutes = Router();
 
 // Register each module here. Paths are relative to /api.
+apiRoutes.use('/addresses', addressRoutes);
 apiRoutes.use('/auth', authRoutes);
 apiRoutes.use('/blogs', blogRoutes);
+apiRoutes.use('/cart', cartRoutes);
 apiRoutes.use('/categories', categoryRoutes);
 apiRoutes.use('/products', productRoutes);
 
