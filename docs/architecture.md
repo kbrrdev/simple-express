@@ -98,8 +98,10 @@ Central route registration. Module routes are mounted under `/api`.
 | `/health`         | API and database health check |
 | `/api-docs`       | Swagger UI                    |
 | `/api-docs.json`  | OpenAPI document              |
+| `/api/addresses`  | Addresses module              |
 | `/api/auth`       | Auth module                   |
 | `/api/blogs`      | Blogs module                  |
+| `/api/cart`       | Cart module                   |
 | `/api/categories` | Categories module             |
 | `/api/products`   | Products module               |
 
@@ -140,6 +142,22 @@ Central route registration. Module routes are mounted under `/api`.
 - Option values must match the product's options, and each combination is unique within a product. Options can be renamed, but not added or removed after creation.
 - Products and variants are deactivated instead of deleted, so that future orders can keep referencing them.
 - Public routes only return active products that have an active variant, and only their active variants.
+
+## Cart
+
+- `cart_items` holds one row per user and variant, so each user has one cart.
+- Prices are never stored in the cart. They are read from the variant on each request.
+- Carts do not reserve stock. Stock is checked when items are added, and must be checked again at checkout.
+- Adding to the cart checks the quantity limit inside the upsert, so parallel requests cannot exceed it.
+- Guest carts are kept by the client. `POST /api/cart/preview` prices them, and `POST /api/cart/merge` moves them into the user's cart after login, keeping the higher quantity for items in both.
+
+## Addresses
+
+- Addresses are limited to the Philippines, so there is no country column.
+- Each user can save up to 20 addresses, and has one default while they have any. A partial unique index enforces the single default.
+- Changes that affect the default or the limit lock the user's row, so parallel requests run in turn.
+- Addresses are deleted outright. Orders must copy the address, so that editing or deleting one never changes a past order.
+- Another user's address returns `404`, so that IDs cannot be probed.
 
 ## Validation
 

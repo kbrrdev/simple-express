@@ -36,6 +36,20 @@
       "when": 1793901835879,
       "tag": "0004_add_blog_author",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793903508787,
+      "tag": "0005_create_cart",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793904632221,
+      "tag": "0006_create_addresses",
+      "breakpoints": true
     }
   ]
 }

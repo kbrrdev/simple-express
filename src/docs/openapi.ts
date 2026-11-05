@@ -1,5 +1,11 @@
+import {
+  addressParameters,
+  addressPaths,
+  addressSchemas,
+} from '../modules/addresses/address.openapi';
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi';
 import { blogParameters, blogPaths, blogSchemas } from '../modules/blogs/blog.openapi';
+import { cartParameters, cartPaths, cartSchemas } from '../modules/cart/cart.openapi';
 import {
   categoryParameters,
   categoryPaths,
@@ -29,6 +35,8 @@ export const openApiDocument = {
     { name: 'Blogs' },
     { name: 'Categories' },
     { name: 'Products' },
+    { name: 'Cart' },
+    { name: 'Addresses' },
   ],
   paths: {
     '/health': {
@@ -56,6 +64,8 @@ export const openApiDocument = {
     ...blogPaths,
     ...categoryPaths,
     ...productPaths,
+    ...cartPaths,
+    ...addressPaths,
   },
   components: {
     securitySchemes: {
@@ -65,6 +75,8 @@ export const openApiDocument = {
       ...blogParameters,
       ...categoryParameters,
       ...productParameters,
+      ...cartParameters,
+      ...addressParameters,
     },
     responses: {
       BadRequest: { description: 'The request is invalid', content: errorContent },
@@ -83,6 +95,8 @@ export const openApiDocument = {
       ...blogSchemas,
       ...categorySchemas,
       ...productSchemas,
+      ...cartSchemas,
+      ...addressSchemas,
       PageMeta: {
         type: 'object',
         required: ['page', 'limit', 'total'],

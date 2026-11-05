@@ -122,8 +122,10 @@ src/
 ├── middleware/
 ├── routes/
 └── modules/
+    ├── addresses/
     ├── auth/
     ├── blogs/
+    ├── cart/
     ├── categories/
     └── products/
 
@@ -329,6 +331,65 @@ A product with no options still has one variant, without any option values. Pric
 Product lists support `page`, `limit`, `search`, `categoryId`, and `sort` (`newest` or `name`).
 
 To restore a deactivated product or variant, set `active` to `true` with `PATCH`.
+
+## Cart
+
+Each logged-in user has one cart, which follows them across devices. Prices are read from the variants each time, so a cart always shows current prices.
+
+| Endpoint | Description | Requires access token |
+|---|---|---|
+| `GET /api/cart` | Get the cart | Yes |
+| `DELETE /api/cart` | Empty the cart | Yes |
+| `POST /api/cart/items` | Add a variant, combining with any existing quantity | Yes |
+| `PATCH /api/cart/items/:variantId` | Set the quantity of an item | Yes |
+| `DELETE /api/cart/items/:variantId` | Remove an item | Yes |
+| `POST /api/cart/preview` | Price a guest cart without saving it | No |
+| `POST /api/cart/merge` | Move a guest cart into the user's cart | Yes |
+
+An item can have a quantity of up to 99, and adding more than the available stock returns `409`. Carts do not reserve stock, so `stock` can drop below `quantity` after an item is added. Show a warning when it does. Items that are deactivated stay in the cart with `available: false`, and are left out of the subtotal.
+
+### Guest Carts
+
+The API does not store guest carts. The client keeps each item's `variantId` and `quantity` on the device, then:
+
+1. Sends them to `/api/cart/preview` to show current prices.
+2. Asks the guest to log in at checkout.
+3. Sends them to `/api/cart/merge`, then clears its local copy.
+
+A merge keeps the higher quantity for an item in both carts, so retrying one is safe. Quantities are reduced to the available stock, and unavailable variants are skipped. Both are listed in `adjustments` in the response, so the client can tell the customer.
+
+## Addresses
+
+Logged-in users can save up to 20 delivery addresses in the Philippines. Requesting another user's address returns `404`.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/addresses` | List addresses, default first |
+| `GET /api/addresses/:id` | Get an address |
+| `POST /api/addresses` | Add an address |
+| `PATCH /api/addresses/:id` | Update an address |
+| `DELETE /api/addresses/:id` | Delete an address |
+| `POST /api/addresses/:id/default` | Make an address the default |
+
+```json
+{
+  "recipientName": "Juan Dela Cruz",
+  "phone": "09171234567",
+  "line1": "123 Rizal Street",
+  "line2": "Sunrise Village",
+  "barangay": "San Antonio",
+  "city": "Pasig",
+  "province": "Metro Manila",
+  "postalCode": "1605"
+}
+```
+
+- `line2` is optional.
+- `phone` must be a Philippine mobile number, and is stored as `+639171234567`. Landlines are not accepted.
+- `province` should be `Metro Manila` for addresses in the capital region.
+- `postalCode` must be 4 digits.
+
+A user's first address becomes the default. Deleting the default makes the newest remaining address the default.
 
 ## Testing
 
