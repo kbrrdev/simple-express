@@ -128,10 +128,7 @@ Central route registration. Module routes are mounted under `/api`.
 
 ## Blogs
 
-- Blogs are public to read.
-- `author_id` records the user who owns a blog, and is empty for blogs created before ownership was added.
-- Customers can update and delete their own blogs, and admins can update and delete any blog.
-- Setting `BLOG_CUSTOMER_WRITES_ENABLED` to `false` limits all blog writes to admins.
+Blogs are public to read. Only admins can create, update, and delete them.
 
 ## Products
 

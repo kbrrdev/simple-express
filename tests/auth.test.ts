@@ -393,6 +393,7 @@ describe('blogs', () => {
   });
 
   it('requires a token to create, update and delete', async () => {
+    await db.update(users).set({ role: 'admin' }).where(eq(users.email, credentials.email));
     const { accessToken } = (await login()).body.data;
     const created = await api().post('/api/blogs').set(bearer(accessToken)).send(blog).expect(201);
     const path = `/api/blogs/${created.body.data.id}`;

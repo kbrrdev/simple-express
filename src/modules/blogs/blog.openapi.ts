@@ -62,7 +62,7 @@ export const blogPaths = {
     },
     post: {
       tags,
-      summary: 'Create a blog',
+      summary: 'Create a blog (admin)',
       security,
       requestBody: {
         required: true,
@@ -102,7 +102,7 @@ export const blogPaths = {
     },
     patch: {
       tags,
-      summary: 'Update a blog (its owner or an admin)',
+      summary: 'Update a blog (admin)',
       security,
       parameters: [blogId],
       requestBody: {
@@ -122,7 +122,7 @@ export const blogPaths = {
     },
     delete: {
       tags,
-      summary: 'Delete a blog (its owner or an admin)',
+      summary: 'Delete a blog (admin)',
       security,
       parameters: [blogId],
       responses: {
@@ -149,26 +149,12 @@ export const blogParameters = {
 export const blogSchemas = {
   Blog: {
     type: 'object',
-    required: [
-      'id',
-      'title',
-      'content',
-      'author',
-      'authorId',
-      'published',
-      'createdAt',
-      'updatedAt',
-    ],
+    required: ['id', 'title', 'content', 'author', 'published', 'createdAt', 'updatedAt'],
     properties: {
       id: { type: 'string', format: 'uuid' },
       title: { type: 'string', maxLength: 255, example: 'Hello' },
       content: { type: 'string', example: 'First post' },
       author: { type: 'string', maxLength: 100, example: 'Jane' },
-      authorId: {
-        type: ['string', 'null'],
-        format: 'uuid',
-        description: 'The user who owns the blog',
-      },
       published: { type: 'boolean' },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },

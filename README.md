@@ -282,15 +282,7 @@ In the production container, run `docker compose exec api node dist/db/make-admi
 
 ## Blogs
 
-Blogs are public to read. Any logged-in user can create one and becomes its owner. Customers can update and delete their own blogs, and admins can update and delete any blog.
-
-To let only admins write blogs, set this in `.env`:
-
-```bash
-BLOG_CUSTOMER_WRITES_ENABLED=false
-```
-
-Customers then cannot create, update, or delete blogs, including ones they already own. Blogs created before ownership was added have no owner, so only admins can change them.
+Blogs are public to read. Only admins can create, update, and delete them.
 
 ## Products
 
