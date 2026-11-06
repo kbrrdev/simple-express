@@ -1,4 +1,13 @@
-import { index, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 export const userRole = pgEnum('user_role', ['customer', 'admin']);
 
@@ -28,8 +37,16 @@ export const sessions = pgTable(
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [
-    index('sessions_user_id_idx').on(table.userId),
-    index('sessions_previous_refresh_token_hash_idx').on(table.previousRefreshTokenHash),
-  ],
+  (table) => [index('sessions_user_id_idx').on(table.userId)],
+);
+
+export const loginAttempts = pgTable(
+  'login_attempts',
+  {
+    email: varchar({ length: 255 }).primaryKey(),
+    failedCount: integer('failed_count').notNull().default(1),
+    lastFailedAt: timestamp('last_failed_at', { withTimezone: true }).notNull().defaultNow(),
+    blockedUntil: timestamp('blocked_until', { withTimezone: true }),
+  },
+  (table) => [index('login_attempts_last_failed_at_idx').on(table.lastFailedAt)],
 );

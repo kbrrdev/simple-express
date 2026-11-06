@@ -56,6 +56,36 @@ describe('client IP address', () => {
   });
 });
 
+describe('security headers', () => {
+  it('are sent on API responses', async () => {
+    const { headers } = await request(app).get('/health').expect(200);
+
+    expect(headers['x-content-type-options']).toBe('nosniff');
+    expect(headers['strict-transport-security']).toContain('max-age');
+    expect(headers['content-security-policy']).toContain("default-src 'self'");
+    expect(headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('are sent on errors', async () => {
+    const { headers } = await request(app).get('/nope').expect(404);
+
+    expect(headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('let other origins load uploaded images', async () => {
+    const { headers } = await request(app).get('/health').expect(200);
+
+    expect(headers['cross-origin-resource-policy']).toBe('cross-origin');
+  });
+
+  it('do not force HTTPS on Swagger UI in development', async () => {
+    const { headers } = await request(app).get('/health').expect(200);
+
+    expect(headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+  });
+});
+
 describe('API documentation', () => {
   it('is available outside production', async () => {
     await request(app).get('/api-docs.json').expect(200);

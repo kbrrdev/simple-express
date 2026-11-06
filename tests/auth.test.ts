@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import express from 'express';
 import jwt from 'jsonwebtoken';
@@ -6,7 +7,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { env } from '../src/config/env';
 import { db, pool } from '../src/db';
-import { sessions, users } from '../src/db/schema';
+import { loginAttempts, sessions, users } from '../src/db/schema';
 import { errorHandler } from '../src/middleware/error-handler';
 import { requireAdmin, requireAuth } from '../src/middleware/require-auth';
 import { credentialsLimiter, refreshLimiter } from '../src/modules/auth/auth.routes';
@@ -44,7 +45,7 @@ async function endGracePeriod() {
 }
 
 beforeEach(async () => {
-  await db.execute(sql`truncate table users, sessions, blogs cascade`);
+  await db.execute(sql`truncate table users, sessions, blogs, login_attempts cascade`);
   await resetLimits();
   await api().post('/api/auth/register').send(credentials).expect(201);
 });
@@ -387,6 +388,253 @@ describe('refresh', () => {
   });
 });
 
+describe('refresh token reuse', () => {
+  it('revokes the session when a token from two rotations ago is replayed', async () => {
+    const first = (await login()).body.data.refreshToken;
+    const second = (await refresh(first).expect(200)).body.data;
+    const third = (await refresh(second.refreshToken).expect(200)).body.data;
+
+    await refresh(first).expect(401);
+
+    await getMe(third.accessToken).expect(401);
+    await refresh(third.refreshToken).expect(401);
+  });
+
+  it('only revokes the session the token belongs to', async () => {
+    const stolen = (await login()).body.data.refreshToken;
+    const otherDevice = (await login()).body.data;
+    const next = (await refresh(stolen).expect(200)).body.data;
+    await refresh(next.refreshToken).expect(200);
+
+    await refresh(stolen).expect(401);
+
+    await getMe(otherDevice.accessToken).expect(200);
+  });
+
+  it('does not let a forged token revoke a session', async () => {
+    const token: string = (await login()).body.data.refreshToken;
+    const [sessionId, secret, signature] = token.split('.');
+
+    await refresh(`${sessionId}.made-up-secret.${signature}`).expect(401);
+    await refresh(`${sessionId}.${secret}.bad-signature`).expect(401);
+    await refresh(sessionId ?? '').expect(401);
+
+    await refresh(token).expect(200);
+  });
+
+  it('rejects a token that was signed with another secret', async () => {
+    const token: string = (await login()).body.data.refreshToken;
+    const [sessionId, secret] = token.split('.');
+    const value = `${sessionId}.${secret}`;
+    const signature = createHmac('sha256', 'another-secret-of-at-least-32-characters')
+      .update(`refresh-token:${value}`)
+      .digest('base64url');
+
+    await refresh(`${value}.${signature}`).expect(401);
+    await refresh(token).expect(200);
+  });
+
+  it('keeps sessions separate from the refresh token value', async () => {
+    const response = await login();
+    const [row] = await db.select().from(sessions);
+
+    expect(row?.refreshTokenHash).not.toContain(response.body.data.refreshToken);
+    expect(response.body.data.refreshToken.startsWith(`${row?.id}.`)).toBe(true);
+  });
+});
+
+describe('failed logins for one account', () => {
+  const wrongLogin = (email = credentials.email) =>
+    api().post('/api/auth/login').send({ email, password: 'wrong-password', client: 'native' });
+
+  const rightLogin = () =>
+    api()
+      .post('/api/auth/login')
+      .send({ ...credentials, client: 'native' });
+
+  const failFiveTimes = async (email?: string) => {
+    for (let i = 0; i < 5; i++) {
+      await wrongLogin(email).expect(401);
+    }
+  };
+
+  const delaySeconds = async (email = credentials.email) => {
+    const [row] = await db.select().from(loginAttempts).where(eq(loginAttempts.email, email));
+    return Math.round(((row?.blockedUntil?.getTime() ?? 0) - Date.now()) / 1000);
+  };
+
+  const endDelay = () =>
+    db.update(loginAttempts).set({ blockedUntil: new Date(Date.now() - 1000) });
+
+  it('allows four failures', async () => {
+    for (let i = 0; i < 4; i++) {
+      await wrongLogin().expect(401);
+    }
+
+    expect(await delaySeconds()).toBeLessThanOrEqual(0);
+    await rightLogin().expect(200);
+  });
+
+  it('delays the account after five, even with the right password', async () => {
+    await failFiveTimes();
+
+    const response = await rightLogin();
+
+    expect(response.status).toBe(429);
+    expect(response.body).toEqual({ error: { message: 'Too many requests, try again later' } });
+    expect(await delaySeconds()).toBeGreaterThan(20);
+  });
+
+  it('treats an unknown email the same, so it reveals nothing', async () => {
+    await failFiveTimes('nobody@example.com');
+
+    await wrongLogin('nobody@example.com').expect(429);
+  });
+
+  it('does not affect other accounts', async () => {
+    await failFiveTimes('nobody@example.com');
+
+    await rightLogin().expect(200);
+  });
+
+  it('allows logging in once the delay ends, and clears the record', async () => {
+    await failFiveTimes();
+    await endDelay();
+
+    await rightLogin().expect(200);
+
+    expect(await db.select().from(loginAttempts)).toEqual([]);
+  });
+
+  it('doubles the delay up to five minutes', async () => {
+    await failFiveTimes();
+    const delays = [await delaySeconds()];
+
+    for (let i = 0; i < 6; i++) {
+      await resetLimits();
+      await endDelay();
+      await wrongLogin().expect(401);
+      delays.push(await delaySeconds());
+    }
+
+    expect(delays).toEqual([30, 60, 120, 240, 300, 300, 300]);
+  });
+
+  it('forgets failures after a quiet period', async () => {
+    await failFiveTimes();
+    await db.update(loginAttempts).set({
+      lastFailedAt: new Date(Date.now() - 16 * 60 * 1000),
+      blockedUntil: new Date(Date.now() - 1000),
+    });
+
+    await wrongLogin().expect(401);
+
+    const [row] = await db.select().from(loginAttempts);
+
+    expect(row?.failedCount).toBe(1);
+  });
+});
+
+describe('common passwords', () => {
+  it.each(['password', 'Password', '12345678', 'qwertyuiop'])('rejects %s', async (password) => {
+    const response = await api()
+      .post('/api/auth/register')
+      .send({ email: 'new@example.com', password });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details[0].message).toBe('This password is too common');
+  });
+
+  it('still lets existing accounts log in', async () => {
+    const passwordHash = (await db.select().from(users))[0]?.passwordHash ?? '';
+    await db.insert(users).values({ email: 'old@example.com', passwordHash });
+
+    await api()
+      .post('/api/auth/login')
+      .send({ ...credentials, email: 'old@example.com', client: 'native' })
+      .expect(200);
+  });
+});
+
+describe('changing a password', () => {
+  const newPassword = 'another-long-passphrase';
+
+  const change = (token: string, body: object) =>
+    api().post('/api/auth/change-password').set(bearer(token)).send(body);
+
+  it('requires a token', async () => {
+    await api()
+      .post('/api/auth/change-password')
+      .send({ currentPassword: credentials.password, newPassword })
+      .expect(401);
+  });
+
+  it('replaces the password', async () => {
+    const { accessToken } = (await login()).body.data;
+
+    await change(accessToken, { currentPassword: credentials.password, newPassword }).expect(204);
+
+    await api()
+      .post('/api/auth/login')
+      .send({ ...credentials, client: 'native' })
+      .expect(401);
+    await api()
+      .post('/api/auth/login')
+      .send({ ...credentials, password: newPassword, client: 'native' })
+      .expect(200);
+  });
+
+  it('keeps this session and ends the others', async () => {
+    const current = (await login()).body.data;
+    const other = (await login()).body.data;
+
+    await change(current.accessToken, {
+      currentPassword: credentials.password,
+      newPassword,
+    }).expect(204);
+
+    await getMe(current.accessToken).expect(200);
+    await getMe(other.accessToken).expect(401);
+    await refresh(other.refreshToken).expect(401);
+    await refresh(current.refreshToken).expect(200);
+  });
+
+  it('does not affect other users', async () => {
+    const other = { email: 'other@example.com', password: 'another-password' };
+    await api().post('/api/auth/register').send(other).expect(201);
+    const otherLogin = await api()
+      .post('/api/auth/login')
+      .send({ ...other, client: 'native' })
+      .expect(200);
+    const { accessToken } = (await login()).body.data;
+
+    await change(accessToken, { currentPassword: credentials.password, newPassword }).expect(204);
+
+    await getMe(otherLogin.body.data.accessToken).expect(200);
+  });
+
+  it('rejects a wrong current password and changes nothing', async () => {
+    const { accessToken } = (await login()).body.data;
+
+    const response = await change(accessToken, {
+      currentPassword: 'wrong-password',
+      newPassword,
+    }).expect(400);
+
+    expect(response.body.error.message).toBe('Current password is incorrect');
+    await login();
+  });
+
+  it('rejects the same, common or short passwords', async () => {
+    const { accessToken } = (await login()).body.data;
+    const currentPassword = credentials.password;
+
+    await change(accessToken, { currentPassword, newPassword: currentPassword }).expect(400);
+    await change(accessToken, { currentPassword, newPassword: 'password' }).expect(400);
+    await change(accessToken, { currentPassword, newPassword: 'short' }).expect(400);
+  });
+});
+
 describe('blogs', () => {
   it('keeps reads public', async () => {
     await api().get('/api/blogs').expect(200);
@@ -417,16 +665,16 @@ describe('blogs', () => {
 describe('protection', () => {
   it('rate limits repeated login attempts', async () => {
     await resetLimits();
-    const attempt = () =>
+    const attempt = (index: number) =>
       api()
         .post('/api/auth/login')
-        .send({ ...credentials, password: 'wrong-password', client: 'native' });
+        .send({ email: `user${index}@example.com`, password: 'wrong-password', client: 'native' });
 
     for (let i = 0; i < 10; i++) {
-      await attempt().expect(401);
+      await attempt(i).expect(401);
     }
 
-    const limited = await attempt();
+    const limited = await attempt(10);
 
     expect(limited.status).toBe(429);
     expect(limited.body.error.message).toEqual(expect.any(String));

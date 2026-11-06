@@ -2,7 +2,7 @@ import type { CookieOptions, Request, Response } from 'express';
 import { env } from '../../config/env';
 import { AppError } from '../../lib/app-error';
 import * as authService from './auth.service';
-import type { LoginBody, RefreshBody, RegisterBody } from './auth.validation';
+import type { ChangePasswordBody, LoginBody, RefreshBody, RegisterBody } from './auth.validation';
 
 const REFRESH_COOKIE = 'refreshToken';
 
@@ -67,6 +67,15 @@ export async function logout(_req: Request, res: Response) {
 export async function logoutAll(_req: Request, res: Response) {
   await authService.logoutAll(res.locals.auth.userId);
   res.clearCookie(REFRESH_COOKIE, refreshCookieOptions);
+  res.status(204).send();
+}
+
+export async function changePassword(
+  req: Request<object, object, ChangePasswordBody>,
+  res: Response,
+) {
+  const { userId, sessionId } = res.locals.auth;
+  await authService.changePassword(userId, sessionId, req.body);
   res.status(204).send();
 }
 

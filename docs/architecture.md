@@ -15,7 +15,7 @@ Client
 Express Application
   |
   v
-Global Middleware (CORS, JSON and cookie parsing)
+Global Middleware (security headers, CORS, JSON and cookie parsing)
   |
   v
 Routes
@@ -118,15 +118,17 @@ Central route registration. Module routes are mounted under `/api`.
 ## Authentication
 
 - Access tokens are JWTs valid for 15 minutes, signed with `JWT_SECRET`, and sent as bearer tokens.
-- Refresh tokens are random values valid for 30 days. Only their SHA-256 hashes are stored.
+- Refresh tokens are valid for 30 days, and hold the session ID, a random secret, and an HMAC signature. Only their SHA-256 hashes are stored.
 - Each login creates a row in `sessions`, and the session ID is included in the access token.
 - The `requireAuth` middleware checks the session on every protected request, so revoking a session takes effect immediately.
-- Refresh tokens rotate on each use. Reusing an old token after a 30-second grace period revokes the session.
+- Refresh tokens rotate on each use. A correctly signed token that is no longer current revokes its session, apart from the previous token, which is allowed for 30 seconds. Forged tokens are rejected without touching the session.
 - Web clients receive the refresh token as an `httpOnly` cookie, and native clients receive it in the response body.
 - Users are a `customer` or an `admin`. `requireAuth` reads the role from the database on every request, so role changes apply immediately. `requireAdmin` runs after it and returns `403` for non-admins.
 - Roles can only be changed with the `db:make-admin` script, not through the API.
 - Passwords are hashed with Argon2id using Node's built-in `crypto` module.
-- Login, registration, and token refresh are rate limited per IP address.
+- New passwords are checked against a bundled list of common passwords. Changing a password keeps the current session and revokes the others.
+- Login, registration, password changes, and token refresh are rate limited per IP address, in memory.
+- Failed logins are also tracked per email in `login_attempts`, including unknown emails. After five failures, the email is delayed for 30 seconds, doubling up to five minutes.
 
 ## Blogs
 

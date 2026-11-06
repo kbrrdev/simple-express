@@ -129,6 +129,27 @@ export const authPaths = {
       },
     },
   },
+  '/api/auth/change-password': {
+    post: {
+      tags,
+      summary: 'Change the current user’s password',
+      description: 'The current session stays active, and all others are revoked.',
+      security,
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': { schema: { $ref: '#/components/schemas/ChangePasswordBody' } },
+        },
+      },
+      responses: {
+        204: { description: 'The password was changed' },
+        400: badRequest,
+        401: unauthorized,
+        429: tooManyRequests,
+        500: serverError,
+      },
+    },
+  },
   '/api/auth/logout': {
     post: {
       tags,
@@ -184,7 +205,28 @@ export const authSchemas = {
     additionalProperties: false,
     properties: {
       email: { type: 'string', format: 'email', maxLength: 255, example: 'jane@example.com' },
-      password: { type: 'string', minLength: 8, maxLength: 128, example: 'correct-horse-battery' },
+      password: {
+        type: 'string',
+        minLength: 8,
+        maxLength: 128,
+        description: 'Common passwords are rejected',
+        example: 'correct-horse-battery',
+      },
+    },
+  },
+  ChangePasswordBody: {
+    type: 'object',
+    required: ['currentPassword', 'newPassword'],
+    additionalProperties: false,
+    properties: {
+      currentPassword: { type: 'string', maxLength: 128, example: 'correct-horse-battery' },
+      newPassword: {
+        type: 'string',
+        minLength: 8,
+        maxLength: 128,
+        description: 'Common passwords are rejected',
+        example: 'another-long-passphrase',
+      },
     },
   },
   LoginBody: {
