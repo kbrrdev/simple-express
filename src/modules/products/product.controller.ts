@@ -1,8 +1,10 @@
 import type { Request, Response } from 'express';
 import * as productService from './product.service';
 import type {
+  AddImageBody,
   CreateProductBody,
   ListProductsQuery,
+  UpdateImageBody,
   UpdateProductBody,
   UpdateVariantBody,
   VariantBody,
@@ -10,6 +12,7 @@ import type {
 
 type IdParams = { id: string };
 type VariantParams = { id: string; variantId: string };
+type ImageParams = { id: string; imageId: string };
 
 export async function list(req: Request, res: Response) {
   // The validate middleware has already converted and defaulted the query.
@@ -41,6 +44,23 @@ export async function update(req: Request<IdParams, object, UpdateProductBody>, 
 
 export async function remove(req: Request<IdParams>, res: Response) {
   await productService.deactivateProduct(req.params.id);
+  res.status(204).send();
+}
+
+export async function addImage(req: Request<IdParams, object, AddImageBody>, res: Response) {
+  res.status(201).json({ data: await productService.addImage(req.params.id, req.body) });
+}
+
+export async function updateImage(
+  req: Request<ImageParams, object, UpdateImageBody>,
+  res: Response,
+) {
+  const { id, imageId } = req.params;
+  res.json({ data: await productService.updateImage(id, imageId, req.body) });
+}
+
+export async function removeImage(req: Request<ImageParams>, res: Response) {
+  await productService.removeImage(req.params.id, req.params.imageId);
   res.status(204).send();
 }
 

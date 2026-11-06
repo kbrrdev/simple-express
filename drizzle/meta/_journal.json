@@ -57,6 +57,13 @@
       "when": 1793905654684,
       "tag": "0007_remove_blog_author",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793906705036,
+      "tag": "0008_create_assets",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { routes } from './routes';
 export const app = express();
 
 app.disable('x-powered-by');
+app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
 // Runs before body parsing so that error responses also carry CORS headers.
 app.use(cors({ origin: env.CORS_ORIGINS, credentials: true, exposedHeaders: ['Location'] }));

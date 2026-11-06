@@ -64,7 +64,7 @@ Database connection, migration runner, and schema exports.
 
 ### docs/
 
-Shared OpenAPI definitions, combined with each module's documentation and served by Swagger UI.
+Shared OpenAPI definitions, combined with each module's documentation and served by Swagger UI outside production. The Postman collection in this folder is generated from them.
 
 ### lib/
 
@@ -96,9 +96,10 @@ Central route registration. Module routes are mounted under `/api`.
 | Path              | Description                   |
 | ----------------- | ----------------------------- |
 | `/health`         | API and database health check |
-| `/api-docs`       | Swagger UI                    |
-| `/api-docs.json`  | OpenAPI document              |
+| `/api-docs`       | Swagger UI, not in production |
+| `/api-docs.json`  | OpenAPI, not in production    |
 | `/api/addresses`  | Addresses module              |
+| `/api/assets`     | Assets module                 |
 | `/api/auth`       | Auth module                   |
 | `/api/blogs`      | Blogs module                  |
 | `/api/cart`       | Cart module                   |
@@ -112,6 +113,7 @@ Central route registration. Module routes are mounted under `/api`.
 - Drizzle Kit generates migrations into `drizzle/`.
 - Each module defines its tables in `<name>.schema.ts`, exported through `src/db/schema.ts`.
 - Docker applies pending migrations when the API container starts. Outside Docker, run `npm run db:migrate`.
+- The API connects with `DATABASE_URL`, a limited role that can read and write rows only. Migrations use `MIGRATION_DATABASE_URL`, and create the limited role and its grants.
 
 ## Authentication
 
@@ -156,6 +158,16 @@ Blogs are public to read. Only admins can create, update, and delete them.
 - Addresses are deleted outright. Orders must copy the address, so that editing or deleting one never changes a past order.
 - Another user's address returns `404`, so that IDs cannot be probed.
 
+## Assets
+
+- `assets` is the central table for uploaded files. Other tables reference it with foreign keys, which block deleting a file that is in use.
+- Uploads go to memory first and are limited to 5 MB. Types are detected from the file's bytes, and only JPEG, PNG, and WebP are accepted.
+- Files use random names. Only the path is stored, and URLs are built when responses are sent.
+- `src/lib/storage.ts` holds all file access. It uses S3 when `S3_BUCKET` is set, and otherwise writes to disk and serves files at `/uploads`.
+- `env.ts` rejects a partial S3 setup at startup, so that uploads never fall back to disk by accident.
+- A product has up to 10 rows in `product_images`, which hold the alt text and position. A variant's `asset_id` has a composite foreign key to `product_images`, which keeps the image on the same product and blocks removing it while in use.
+- Cart items use the variant's image, then the product's first image.
+
 ## Validation
 
 The `validate` middleware checks request bodies, parameters, and query strings against Joi schemas. Unknown fields are rejected.
@@ -187,7 +199,7 @@ API tests live in `tests/` and run with Vitest and Supertest against a disposabl
 
 ## Docker
 
-- `docker-compose.yml` runs the production image and PostgreSQL.
+- `docker-compose.yml` runs the production image and PostgreSQL, and keeps uploads in the `uploads-data` volume.
 - `docker-compose.dev.yml` adds the development image, live reload, and Adminer, used by `npm run docker:watch`.
 - PostgreSQL is published on host port `5433` by default.
 - The `db-test` service runs only with the `test` profile.

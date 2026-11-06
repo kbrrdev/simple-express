@@ -3,9 +3,12 @@ import { requireAdmin, requireAuth } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './product.controller';
 import {
+  addImageBody,
   createProductBody,
+  imageParams,
   listProductsQuery,
   productParams,
+  updateImageBody,
   updateProductBody,
   updateVariantBody,
   variantBody,
@@ -45,6 +48,29 @@ productRoutes.delete(
   requireAdmin,
   validate('params', productParams),
   controller.remove,
+);
+productRoutes.post(
+  '/:id/images',
+  requireAuth,
+  requireAdmin,
+  validate('params', productParams),
+  validate('body', addImageBody),
+  controller.addImage,
+);
+productRoutes.patch(
+  '/:id/images/:imageId',
+  requireAuth,
+  requireAdmin,
+  validate('params', imageParams),
+  validate('body', updateImageBody),
+  controller.updateImage,
+);
+productRoutes.delete(
+  '/:id/images/:imageId',
+  requireAuth,
+  requireAdmin,
+  validate('params', imageParams),
+  controller.removeImage,
 );
 productRoutes.post(
   '/:id/variants',

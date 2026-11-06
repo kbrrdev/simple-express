@@ -141,6 +141,7 @@ describe('adding items', () => {
           variantId: medium,
           productId: shirtId,
           productName: 'Classic T-Shirt',
+          imageUrl: null,
           option1Name: 'Size',
           option1Value: 'M',
           option2Name: null,

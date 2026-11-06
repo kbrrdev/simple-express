@@ -7,8 +7,18 @@ interface Env {
   NODE_ENV: 'development' | 'test' | 'production';
   PORT: number;
   DATABASE_URL: string;
+  MIGRATION_DATABASE_URL?: string;
+  TRUST_PROXY_HOPS: number;
   CORS_ORIGINS: string[];
   JWT_SECRET: string;
+  PUBLIC_BASE_URL: string;
+  UPLOADS_DIR: string;
+  S3_BUCKET?: string;
+  S3_REGION?: string;
+  S3_ACCESS_KEY_ID?: string;
+  S3_SECRET_ACCESS_KEY?: string;
+  S3_ENDPOINT?: string;
+  S3_PUBLIC_URL?: string;
 }
 
 const isOrigin = (value: string) => URL.canParse(value) && new URL(value).origin === value;
@@ -23,14 +33,33 @@ const parseOrigins: Joi.CustomValidator<string, string[]> = (value, helpers) => 
   return origins.every(isOrigin) ? origins : helpers.error('any.invalid');
 };
 
+const url = Joi.string().uri().empty('').replace(/\/+$/, '');
+
+/** Required once S3_BUCKET is set, so that a partial setup fails at startup. */
+const s3Setting = Joi.string()
+  .empty('')
+  .when('S3_BUCKET', { is: Joi.exist(), then: Joi.required() });
+
 const envSchema = Joi.object<Env>({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   PORT: Joi.number().port().default(3000),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgres', 'postgresql'] })
     .required(),
+  MIGRATION_DATABASE_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .empty(''),
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).empty('').default(0),
   CORS_ORIGINS: Joi.string().empty('').default([]).custom(parseOrigins),
   JWT_SECRET: Joi.string().min(32).required(),
+  PUBLIC_BASE_URL: url.default('http://localhost:3000'),
+  UPLOADS_DIR: Joi.string().empty('').default('uploads'),
+  S3_BUCKET: Joi.string().empty(''),
+  S3_REGION: s3Setting,
+  S3_ACCESS_KEY_ID: s3Setting,
+  S3_SECRET_ACCESS_KEY: s3Setting,
+  S3_ENDPOINT: url,
+  S3_PUBLIC_URL: url.when('S3_ENDPOINT', { is: Joi.exist(), then: Joi.required() }),
 }).unknown();
 
 const { error, value } = envSchema.validate(process.env, { abortEarly: false });

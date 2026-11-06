@@ -39,14 +39,27 @@ services:
       PORT: 3000
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-blog}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:${PORT:-3000}}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+      # The API runs as a limited role. The owner is only used for migrations.
+      DATABASE_URL: postgres://${APP_DB_USER:-app}:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB:-blog}
+      MIGRATION_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-blog}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
     ports:
       - '${PORT:-3000}:3000'
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
     # Apply pending migrations, then hand over to node so it receives SIGTERM directly.
-    command: sh -c "node dist/db/migrate.js && exec node dist/index.js"
+    command: sh -c "node dist/db/migrate.js && unset MIGRATION_DATABASE_URL && exec node dist/index.js"
 
 volumes:
   db-data:
+  uploads-data:

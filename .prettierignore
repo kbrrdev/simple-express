@@ -2,3 +2,5 @@ dist
 drizzle
 node_modules
 package-lock.json
+uploads
+docs/postman-collection.json

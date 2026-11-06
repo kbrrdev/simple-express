@@ -6,7 +6,7 @@ services:
       target: dev
     environment:
       NODE_ENV: development
-    command: sh -c "npm run db:migrate && exec npm run dev"
+    command: sh -c "npm run db:migrate && unset MIGRATION_DATABASE_URL && exec npm run dev"
     develop:
       watch:
         # Copied into the container, where tsx watch reloads the app.

@@ -18,7 +18,17 @@ export interface VariantBody {
   active?: boolean;
 }
 
-export type UpdateVariantBody = Partial<VariantBody>;
+export type UpdateVariantBody = Partial<VariantBody> & { assetId?: string | null };
+
+export interface AddImageBody {
+  assetId: string;
+  altText?: string;
+}
+
+export interface UpdateImageBody {
+  altText?: string;
+  position?: number;
+}
 
 export interface CreateProductBody {
   categoryId: string;
@@ -39,6 +49,11 @@ export const productParams = Joi.object({
 export const variantParams = Joi.object({
   id: Joi.string().uuid().required(),
   variantId: Joi.string().uuid().required(),
+});
+
+export const imageParams = Joi.object({
+  id: Joi.string().uuid().required(),
+  imageId: Joi.string().uuid().required(),
 });
 
 export const listProductsQuery = Joi.object<ListProductsQuery>({
@@ -71,6 +86,19 @@ export const variantBody = Joi.object<VariantBody>({
 export const updateVariantBody = Joi.object<UpdateVariantBody>({
   ...variantFields,
   priceCents,
+  assetId: Joi.string().uuid().allow(null),
+}).min(1);
+
+const altText = Joi.string().trim().max(255).allow('');
+
+export const addImageBody = Joi.object<AddImageBody>({
+  assetId: Joi.string().uuid().required(),
+  altText,
+});
+
+export const updateImageBody = Joi.object<UpdateImageBody>({
+  altText,
+  position: Joi.number().integer().min(0).max(1000),
 }).min(1);
 
 export const createProductBody = Joi.object<CreateProductBody>({

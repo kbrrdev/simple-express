@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -11,6 +12,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { assets } from '../assets/asset.schema';
 import { categories } from '../categories/category.schema';
 
 export const products = pgTable(
@@ -40,6 +42,23 @@ export const products = pgTable(
   ],
 );
 
+export const productImages = pgTable(
+  'product_images',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id, { onDelete: 'restrict' }),
+    altText: varchar('alt_text', { length: 255 }).notNull().default(''),
+    position: integer().notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique('product_images_product_asset_unique').on(table.productId, table.assetId)],
+);
+
 export const productVariants = pgTable(
   'product_variants',
   {
@@ -49,6 +68,7 @@ export const productVariants = pgTable(
       .references(() => products.id, { onDelete: 'cascade' }),
     option1Value: varchar('option1_value', { length: 100 }),
     option2Value: varchar('option2_value', { length: 100 }),
+    assetId: uuid('asset_id'),
     priceCents: integer('price_cents').notNull(),
     stock: integer().notNull().default(0),
     active: boolean().notNull().default(true),
@@ -65,6 +85,12 @@ export const productVariants = pgTable(
       .nullsNotDistinct(),
     check('product_variants_price_cents_non_negative', sql`${table.priceCents} >= 0`),
     check('product_variants_stock_non_negative', sql`${table.stock} >= 0`),
+    // Keeps a variant's image on its own product, and blocks removing an image in use.
+    foreignKey({
+      name: 'product_variants_image_fk',
+      columns: [table.productId, table.assetId],
+      foreignColumns: [productImages.productId, productImages.assetId],
+    }),
   ],
 );
 

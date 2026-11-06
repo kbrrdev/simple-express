@@ -57,6 +57,7 @@ const conflict = { $ref: '#/components/responses/Conflict' };
 const serverError = { $ref: '#/components/responses/ServerError' };
 const productId = { $ref: '#/components/parameters/ProductId' };
 const variantId = { $ref: '#/components/parameters/VariantId' };
+const imageId = { $ref: '#/components/parameters/ImageId' };
 
 const tags = ['Products'];
 const security = [{ bearerAuth: [] }];
@@ -155,6 +156,58 @@ export const productPaths = {
       },
     },
   },
+  '/api/products/{id}/images': {
+    post: {
+      tags,
+      summary: 'Add an uploaded asset to a product (admin)',
+      description: 'A product can have up to 10 images.',
+      security,
+      parameters: [productId],
+      requestBody: jsonBody('AddProductImage'),
+      responses: {
+        201: { description: 'The added image', content: dataContent('ProductImage') },
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        404: notFound,
+        409: conflict,
+        500: serverError,
+      },
+    },
+  },
+  '/api/products/{id}/images/{imageId}': {
+    patch: {
+      tags,
+      summary: 'Change the alt text or position of an image (admin)',
+      security,
+      parameters: [productId, imageId],
+      requestBody: jsonBody('UpdateProductImage'),
+      responses: {
+        200: { description: 'The updated image', content: dataContent('ProductImage') },
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        404: notFound,
+        500: serverError,
+      },
+    },
+    delete: {
+      tags,
+      summary: 'Remove an image from a product (admin)',
+      description: 'The uploaded file is kept. Fails with 409 while a variant uses the image.',
+      security,
+      parameters: [productId, imageId],
+      responses: {
+        204: { description: 'The image was removed' },
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        404: notFound,
+        409: conflict,
+        500: serverError,
+      },
+    },
+  },
   '/api/products/{id}/variants': {
     post: {
       tags,
@@ -214,6 +267,12 @@ export const productParameters = {
     required: true,
     schema: { type: 'string', format: 'uuid' },
   },
+  ImageId: {
+    name: 'imageId',
+    in: 'path',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  },
   VariantId: {
     name: 'variantId',
     in: 'path',
@@ -261,6 +320,7 @@ export const productSchemas = {
       'active',
       'createdAt',
       'updatedAt',
+      'images',
       'variants',
     ],
     properties: {
@@ -273,6 +333,7 @@ export const productSchemas = {
       active: { type: 'boolean' },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
+      images: { type: 'array', items: { $ref: '#/components/schemas/ProductImage' } },
       variants: { type: 'array', items: { $ref: '#/components/schemas/ProductVariant' } },
     },
   },
@@ -283,6 +344,7 @@ export const productSchemas = {
       'productId',
       'option1Value',
       'option2Value',
+      'assetId',
       'priceCents',
       'stock',
       'active',
@@ -294,6 +356,11 @@ export const productSchemas = {
       productId: { type: 'string', format: 'uuid' },
       option1Value: { type: ['string', 'null'], maxLength: 100, example: 'M' },
       option2Value: { type: ['string', 'null'], maxLength: 100, example: 'Red' },
+      assetId: {
+        type: ['string', 'null'],
+        format: 'uuid',
+        description: 'The product image for this variant',
+      },
       priceCents,
       stock,
       active: { type: 'boolean' },
@@ -343,6 +410,43 @@ export const productSchemas = {
     type: 'object',
     minProperties: 1,
     additionalProperties: false,
-    properties: variantInput,
+    properties: {
+      ...variantInput,
+      assetId: {
+        type: ['string', 'null'],
+        format: 'uuid',
+        description: "Must be one of the product's images",
+      },
+    },
+  },
+  ProductImage: {
+    type: 'object',
+    required: ['id', 'productId', 'assetId', 'url', 'altText', 'position'],
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      productId: { type: 'string', format: 'uuid' },
+      assetId: { type: 'string', format: 'uuid' },
+      url: { type: 'string', format: 'uri' },
+      altText: { type: 'string', maxLength: 255 },
+      position: { type: 'integer', minimum: 0 },
+    },
+  },
+  AddProductImage: {
+    type: 'object',
+    required: ['assetId'],
+    additionalProperties: false,
+    properties: {
+      assetId: { type: 'string', format: 'uuid' },
+      altText: { type: 'string', maxLength: 255 },
+    },
+  },
+  UpdateProductImage: {
+    type: 'object',
+    minProperties: 1,
+    additionalProperties: false,
+    properties: {
+      altText: { type: 'string', maxLength: 255, example: 'Front view' },
+      position: { type: 'integer', minimum: 0, maximum: 1000, example: 1 },
+    },
   },
 };

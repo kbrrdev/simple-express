@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { products, productVariants } from '../products/product.schema';
+import { findImages } from '../products/product.service';
 import { cartItems } from './cart.schema';
 import { MAX_ITEM_QUANTITY, type CartItemInput } from './cart.validation';
 
@@ -15,6 +16,7 @@ const itemFields = {
   option2Value: productVariants.option2Value,
   unitPriceCents: productVariants.priceCents,
   stock: productVariants.stock,
+  variantAssetId: productVariants.assetId,
   variantActive: productVariants.active,
   productActive: products.active,
 };
@@ -163,12 +165,21 @@ function quantityLimit({ stock }: VariantRow) {
   return Math.min(stock, MAX_ITEM_QUANTITY);
 }
 
-function toCart(rows: (VariantRow & { quantity: number })[]) {
-  const items = rows.map(({ variantActive, productActive, ...row }) => ({
-    ...row,
-    lineTotalCents: row.unitPriceCents * row.quantity,
-    available: variantActive && productActive,
-  }));
+async function toCart(rows: (VariantRow & { quantity: number })[]) {
+  const images = await findImages(rows.map((row) => row.productId));
+
+  const items = rows.map(({ variantActive, productActive, variantAssetId, ...row }) => {
+    const productImages = images.filter((image) => image.productId === row.productId);
+    const image =
+      productImages.find((candidate) => candidate.assetId === variantAssetId) ?? productImages[0];
+
+    return {
+      ...row,
+      imageUrl: image?.url ?? null,
+      lineTotalCents: row.unitPriceCents * row.quantity,
+      available: variantActive && productActive,
+    };
+  });
 
   const subtotalCents = items
     .filter((item) => item.available)
