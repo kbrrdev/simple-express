@@ -1,5 +1,13 @@
+# Rotates container logs, as they would otherwise grow until the disk is full.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '5'
+
 services:
   db:
+    logging: *logging
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -36,8 +44,10 @@ services:
 
   api:
     build: .
+    logging: *logging
     environment:
       PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:${PORT:-3000}}

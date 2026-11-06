@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
+import { logRateLimit } from '../../middleware/rate-limit';
 import { requireAdmin, requireAuth } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import { cartItemsBody } from '../cart/cart.validation';
@@ -23,6 +24,7 @@ export const guestOrderLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: tooManyRequests,
+  handler: logRateLimit,
 });
 
 export const guestPaymentLimiter = rateLimit({
@@ -31,6 +33,7 @@ export const guestPaymentLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: tooManyRequests,
+  handler: logRateLimit,
 });
 
 export const orderRoutes = Router();

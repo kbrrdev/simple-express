@@ -3,6 +3,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { escapeIdentifier, escapeLiteral, Pool } from 'pg';
 import { env } from '../config/env';
 import { toSafeLog } from '../lib/db-errors';
+import { logger } from '../lib/logger';
 
 const pool = new Pool({ connectionString: env.MIGRATION_DATABASE_URL ?? env.DATABASE_URL });
 
@@ -29,12 +30,12 @@ async function main() {
 
   if (env.MIGRATION_DATABASE_URL) await grantAppRole(env.MIGRATION_DATABASE_URL);
 
-  console.log('Migrations applied');
+  logger.info('Migrations applied');
 }
 
 main()
   .catch((error: unknown) => {
-    console.error('Migration failed', toSafeLog(error));
+    logger.error({ err: toSafeLog(error) }, 'Migration failed');
     process.exitCode = 1;
   })
   .finally(() => pool.end());

@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
+import { logger } from '../../lib/logger';
 import { loginAttempts, sessions, users } from './auth.schema';
 import type { ChangePasswordBody, RegisterBody } from './auth.validation';
 
@@ -102,7 +103,10 @@ async function assertLoginAllowed(email: string) {
     .from(loginAttempts)
     .where(and(eq(loginAttempts.email, email), sql`${loginAttempts.blockedUntil} > now()`));
 
-  if (blocked) throw new AppError(429, 'Too many requests, try again later');
+  if (blocked) {
+    logger.warn('Login delayed after repeated failures');
+    throw new AppError(429, 'Too many requests, try again later');
+  }
 }
 
 /** Delays double after the free attempts. A quiet 15 minutes clears the record. */
@@ -215,10 +219,18 @@ export async function refresh(refreshToken: string) {
 
   if (!session) {
     // A correctly signed token that is no longer current has been used before, which suggests theft.
-    await db
+    const revoked = await db
       .update(sessions)
       .set({ revokedAt: now })
-      .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)));
+      .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)))
+      .returning({ userId: sessions.userId });
+
+    if (revoked[0]) {
+      logger.warn(
+        { sessionId, sessionUserId: revoked[0].userId },
+        'Refresh token reused, session revoked',
+      );
+    }
 
     throw new AppError(401, 'Invalid or expired refresh token');
   }
@@ -300,6 +312,8 @@ export async function changePassword(
         and(eq(sessions.userId, userId), ne(sessions.id, sessionId), isNull(sessions.revokedAt)),
       );
   });
+
+  logger.info('Password changed, other sessions ended');
 }
 
 export async function getUser(userId: string) {

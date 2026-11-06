@@ -18,6 +18,7 @@ export default defineConfig({
     fileParallelism: false,
     env: {
       DATABASE_URL: testDatabaseUrl,
+      LOG_LEVEL: 'silent',
       MIGRATION_DATABASE_URL: '',
       TRUST_PROXY_HOPS: '0',
       JWT_SECRET: 'test-only-secret-that-is-at-least-32-characters',

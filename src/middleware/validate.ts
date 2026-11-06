@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import type { ObjectSchema } from 'joi';
 import { AppError } from '../lib/app-error';
+import { recordStep } from '../lib/request-context';
 
 type RequestPart = 'body' | 'params' | 'query';
 
@@ -28,5 +29,6 @@ export const validate =
       writable: true,
       configurable: true,
     });
+    recordStep(`Validated ${part}`);
     next();
   };

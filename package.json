@@ -40,6 +40,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.5.0",
     "pg": "^8.23.1",
+    "pino": "^10.4.0",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
@@ -57,6 +58,7 @@
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",
+    "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",

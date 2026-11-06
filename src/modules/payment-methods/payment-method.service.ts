@@ -2,6 +2,7 @@ import { asc, eq, getTableColumns } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
+import { logger } from '../../lib/logger';
 import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
 import { paymentMethods, type PaymentMethod } from './payment-method.schema';
@@ -54,6 +55,8 @@ export async function createMethod(data: CreatePaymentMethodBody) {
       .returning({ id: paymentMethods.id });
     if (!method) throw new AppError(500, 'Failed to create payment method');
 
+    logger.info({ paymentMethodId: method.id }, 'Payment method added');
+
     return await getMethod(method.id);
   } catch (error) {
     throw toAppError(error);
@@ -69,6 +72,9 @@ export async function updateMethod(id: string, data: UpdatePaymentMethodBody) {
       .returning({ id: paymentMethods.id });
     if (!method) notFound(id);
 
+    // Field names only, so that account details stay out of the logs.
+    logger.info({ paymentMethodId: id, fields: Object.keys(data) }, 'Payment method changed');
+
     return await getMethod(id);
   } catch (error) {
     throw toAppError(error);
@@ -83,6 +89,8 @@ export async function deleteMethod(id: string): Promise<void> {
       .returning({ id: paymentMethods.id });
 
     if (!method) notFound(id);
+
+    logger.info({ paymentMethodId: id }, 'Payment method deleted');
   } catch (error) {
     if (hasDbErrorCode(error, FOREIGN_KEY_VIOLATION)) {
       throw new AppError(409, 'Orders use this payment method, so turn it off instead');
