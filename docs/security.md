@@ -116,4 +116,7 @@ These need an email service. Use Mailpit in development and a real provider in p
 
 ## Decisions
 
+- **Guest orders:** guests cannot use COD, as anonymous orders invite fake ones. Guest checkout has its own rate limit per IP address.
+- **Guest order links:** the link is the only access to a guest order, so it is sent with `Cache-Control: no-store`. Changing `JWT_SECRET` invalidates all of them.
+
 - **Row Level Security:** not used. The API is the only client of the database, and queries are scoped to the user in the service layer. Reconsider it if anything else connects directly.

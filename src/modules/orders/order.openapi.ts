@@ -48,6 +48,9 @@ const listParameters = [
   { name: 'status', in: 'query', schema: { type: 'string', enum: statuses } },
 ];
 
+const tags = ['Orders'];
+const security = [{ bearerAuth: [] }];
+
 const badRequest = { $ref: '#/components/responses/BadRequest' };
 const unauthorized = { $ref: '#/components/responses/Unauthorized' };
 const forbidden = { $ref: '#/components/responses/Forbidden' };
@@ -55,9 +58,27 @@ const notFound = { $ref: '#/components/responses/NotFound' };
 const conflict = { $ref: '#/components/responses/Conflict' };
 const serverError = { $ref: '#/components/responses/ServerError' };
 const orderId = { $ref: '#/components/parameters/OrderId' };
+const guestToken = { $ref: '#/components/parameters/GuestToken' };
+const tooManyRequests = { $ref: '#/components/responses/TooManyRequests' };
 
-const tags = ['Orders'];
-const security = [{ bearerAuth: [] }];
+const adminPaymentAction = (summary: string, description: string) => ({
+  post: {
+    tags,
+    summary,
+    description,
+    security,
+    parameters: [orderId],
+    responses: {
+      200: { description: 'The updated order', content: dataContent('AdminOrder') },
+      400: badRequest,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      409: conflict,
+      500: serverError,
+    },
+  },
+});
 
 export const orderPaths = {
   '/api/orders/preview': {
@@ -114,12 +135,65 @@ export const orderPaths = {
       },
     },
   },
+  '/api/orders/guest': {
+    post: {
+      tags,
+      summary: 'Check out as a guest',
+      description:
+        'Guests pay by GCash or bank transfer only. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.',
+      requestBody: jsonBody('CreateGuestOrder'),
+      responses: {
+        200: { description: 'The original order', content: dataContent('GuestOrder') },
+        201: { description: 'The created order', content: dataContent('GuestOrder') },
+        400: badRequest,
+        409: conflict,
+        429: tooManyRequests,
+        500: serverError,
+      },
+    },
+  },
+  '/api/orders/guest/{token}': {
+    get: {
+      tags,
+      summary: 'View a guest order',
+      parameters: [guestToken],
+      responses: {
+        200: { description: 'The order', content: dataContent('GuestOrder') },
+        400: badRequest,
+        404: notFound,
+        500: serverError,
+      },
+    },
+  },
+  '/api/orders/guest/{token}/payment': {
+    post: {
+      tags,
+      summary: 'Submit a payment reference for a guest order',
+      parameters: [guestToken],
+      requestBody: jsonBody('SubmitPayment'),
+      responses: {
+        200: { description: 'The updated order', content: dataContent('GuestOrder') },
+        400: badRequest,
+        404: notFound,
+        409: conflict,
+        429: tooManyRequests,
+        500: serverError,
+      },
+    },
+  },
   '/api/orders/admin': {
     get: {
       tags,
       summary: 'List all orders (admin)',
       security,
-      parameters: listParameters,
+      parameters: [
+        ...listParameters,
+        {
+          name: 'paymentStatus',
+          in: 'query',
+          schema: { type: 'string', enum: ['unpaid', 'submitted', 'paid', 'refunded'] },
+        },
+      ],
       responses: {
         200: { description: 'A page of orders', content: pageContent('AdminOrder') },
         400: badRequest,
@@ -165,6 +239,18 @@ export const orderPaths = {
       },
     },
   },
+  '/api/orders/admin/{id}/payment/confirm': adminPaymentAction(
+    'Confirm a submitted payment (admin)',
+    'Marks the order paid and moves it to pending.',
+  ),
+  '/api/orders/admin/{id}/payment/reject': adminPaymentAction(
+    'Reject a submitted payment (admin)',
+    'Cancels the order and returns its stock.',
+  ),
+  '/api/orders/admin/{id}/payment/refund': adminPaymentAction(
+    'Record a refund (admin)',
+    'Records a refund made outside the system. The order must be cancelled, returned, or delivered.',
+  ),
   '/api/orders/{id}': {
     get: {
       tags,
@@ -180,10 +266,28 @@ export const orderPaths = {
       },
     },
   },
+  '/api/orders/{id}/payment': {
+    post: {
+      tags,
+      summary: 'Submit a payment reference',
+      description: 'Used after paying by GCash or bank transfer. An admin then checks it.',
+      security,
+      parameters: [orderId],
+      requestBody: jsonBody('SubmitPayment'),
+      responses: {
+        200: { description: 'The updated order', content: dataContent('Order') },
+        400: badRequest,
+        401: unauthorized,
+        404: notFound,
+        409: conflict,
+        500: serverError,
+      },
+    },
+  },
   '/api/orders/{id}/cancel': {
     post: {
       tags,
-      summary: 'Cancel a pending order',
+      summary: 'Cancel a pending or unpaid order',
       description: 'Returns the stock. Fails with 409 once the order has been confirmed.',
       security,
       parameters: [orderId],
@@ -200,6 +304,12 @@ export const orderPaths = {
 };
 
 export const orderParameters = {
+  GuestToken: {
+    name: 'token',
+    in: 'path',
+    required: true,
+    schema: { type: 'string', maxLength: 120 },
+  },
   OrderId: {
     name: 'id',
     in: 'path',
@@ -230,6 +340,8 @@ const orderRequired = [
   'status',
   'paymentMethod',
   'paymentStatus',
+  'paymentDueAt',
+  'paymentDetails',
   'subtotalCents',
   'shippingCents',
   'vatableCents',
@@ -249,6 +361,15 @@ const orderProperties = {
   status: { type: 'string', enum: statuses },
   paymentMethod: { type: 'string', enum: ['cod', 'gcash', 'bank_transfer'] },
   paymentStatus: { type: 'string', enum: ['unpaid', 'submitted', 'paid', 'refunded'] },
+  paymentDueAt: {
+    type: ['string', 'null'],
+    format: 'date-time',
+    description: 'When an unpaid order is cancelled',
+  },
+  paymentDetails: {
+    type: ['string', 'null'],
+    description: 'Where to send payment, while the order is waiting for it',
+  },
   ...totals,
   shippingAddress: {
     type: 'object',
@@ -334,11 +455,68 @@ export const orderSchemas = {
   },
   AdminOrder: {
     type: 'object',
-    required: [...orderRequired, 'userId', 'customerEmail'],
+    required: [...orderRequired, 'userId', 'isGuest', 'customerEmail', 'paymentReference'],
     properties: {
       ...orderProperties,
       userId: { type: ['string', 'null'], format: 'uuid' },
+      isGuest: { type: 'boolean' },
       customerEmail: { type: ['string', 'null'], format: 'email' },
+      paymentReference: { type: ['string', 'null'] },
+    },
+  },
+  GuestOrder: {
+    type: 'object',
+    required: [...orderRequired, 'guestToken'],
+    properties: {
+      ...orderProperties,
+      guestToken: { type: 'string', description: 'Opens this order. Keep it private.' },
+    },
+  },
+  CreateGuestOrder: {
+    type: 'object',
+    required: [
+      'email',
+      'address',
+      'items',
+      'paymentMethod',
+      'expectedTotalCents',
+      'idempotencyKey',
+    ],
+    additionalProperties: false,
+    properties: {
+      email: { type: 'string', format: 'email', maxLength: 255, example: 'guest@example.com' },
+      address: { $ref: '#/components/schemas/CreateAddress' },
+      items: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 100,
+        items: {
+          type: 'object',
+          required: ['variantId', 'quantity'],
+          additionalProperties: false,
+          properties: {
+            variantId: { type: 'string', format: 'uuid' },
+            quantity: { type: 'integer', minimum: 1, maximum: 99, example: 2 },
+          },
+        },
+      },
+      paymentMethod: { type: 'string', enum: ['gcash', 'bank_transfer'] },
+      expectedTotalCents: { type: 'integer', minimum: 0 },
+      idempotencyKey: { type: 'string', format: 'uuid' },
+    },
+  },
+  SubmitPayment: {
+    type: 'object',
+    required: ['reference'],
+    additionalProperties: false,
+    properties: {
+      reference: {
+        type: 'string',
+        minLength: 4,
+        maxLength: 100,
+        pattern: '^[A-Za-z0-9-]+$',
+        example: 'GC-1234567890',
+      },
     },
   },
   CreateOrder: {
@@ -347,7 +525,7 @@ export const orderSchemas = {
     additionalProperties: false,
     properties: {
       addressId: { type: 'string', format: 'uuid' },
-      paymentMethod: { type: 'string', enum: ['cod'] },
+      paymentMethod: { type: 'string', enum: ['cod', 'gcash', 'bank_transfer'] },
       expectedTotalCents: {
         type: 'integer',
         minimum: 0,

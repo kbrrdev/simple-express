@@ -1,7 +1,22 @@
-import { and, asc, count, desc, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { env } from '../../config/env';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
+import { hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
 import { fileUrl } from '../../lib/storage';
 import { addresses } from '../addresses/address.schema';
 import { assets } from '../assets/asset.schema';
@@ -10,21 +25,65 @@ import { cartItems } from '../cart/cart.schema';
 import { previewCart } from '../cart/cart.service';
 import type { CartItemInput } from '../cart/cart.validation';
 import { productImages, products, productVariants } from '../products/product.schema';
-import { orderItems, orders, type Order, type OrderStatus } from './order.schema';
-import type { CreateOrderBody, ListOrdersQuery } from './order.validation';
+import { orderItems, orders, payments, type Order, type OrderStatus } from './order.schema';
+import type { CreateOrderBody, GuestOrderBody, ListOrdersQuery } from './order.validation';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Database = typeof db | Transaction;
 type PricedItem = { unitPriceCents: number; quantity: number };
+type PaymentMethod = Order['paymentMethod'];
+
+interface PlaceOrderInput {
+  owner: { userId: string } | { guestEmail: string };
+  address: Omit<GuestOrderBody['address'], 'line2'> & { line2?: string };
+  items: CheckoutItem[];
+  paymentMethod: PaymentMethod;
+  expectedTotalCents: number;
+  idempotencyKey: string;
+}
+
+const EXPIRY_BATCH_SIZE = 100;
 
 /** The moves an admin can make. Anything not listed here is rejected. */
 const adminTransitions: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  awaiting_payment: ['cancelled'],
   pending: ['confirmed', 'cancelled'],
   confirmed: ['shipped', 'cancelled'],
   shipped: ['delivered', 'returned'],
 };
 
-const adminOrderFields = { ...getTableColumns(orders), customerEmail: users.email };
+const adminOrderFields = {
+  ...getTableColumns(orders),
+  customerEmail: users.email,
+  paymentReference: payments.reference,
+};
+
+function paymentDetails(method: PaymentMethod) {
+  if (method === 'gcash') return env.PAYMENT_GCASH_NUMBER;
+  if (method === 'bank_transfer') return env.PAYMENT_BANK_DETAILS;
+  return undefined;
+}
+
+function signGuestOrder(id: string) {
+  return createHmac('sha256', env.JWT_SECRET).update(`guest-order:${id}`).digest('base64url');
+}
+
+function readGuestToken(token: string) {
+  const [id = '', signature = ''] = token.split('.');
+  const expected = Buffer.from(signGuestOrder(id));
+  const actual = Buffer.from(signature);
+
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return undefined;
+  return id;
+}
+
+function guestOrderById(id: string) {
+  return and(eq(orders.id, id), isNull(orders.userId));
+}
+
+function guestOrderKey({ email, idempotencyKey }: GuestOrderBody) {
+  return and(eq(orders.guestEmail, email), eq(orders.idempotencyKey, idempotencyKey));
+}
 
 /** The only place that sets the fee. A courier's rates would replace this body. */
 export async function calculateShipping(
@@ -90,6 +149,9 @@ function toPublicOrder(order: Order, items: ItemRow[]) {
     status: order.status,
     paymentMethod: order.paymentMethod,
     paymentStatus: order.paymentStatus,
+    paymentDueAt: order.paymentDueAt,
+    paymentDetails:
+      order.status === 'awaiting_payment' ? (paymentDetails(order.paymentMethod) ?? null) : null,
     ...toOrderTotals(order),
     taxRatePercent: order.taxRateBasisPoints / 100,
     pricesIncludeTax: order.pricesIncludeTax,
@@ -154,68 +216,236 @@ export async function createOrder(userId: string, body: CreateOrderBody) {
 
     if (items.length === 0) throw new AppError(409, 'Cart is empty');
 
-    const unavailable = items.filter((item) => !item.variantActive || !item.productActive);
-
-    if (unavailable.length > 0) {
-      throw checkoutError('Some items are no longer available', unavailable, 'is unavailable');
-    }
-
-    const shippingCents = await calculateShipping(items, address);
-    const pricing = priceOrder(items, shippingCents);
-
-    if (pricing.totalCents !== body.expectedTotalCents) {
-      throw new AppError(409, 'The order total has changed');
-    }
-
-    await reduceStock(tx, items);
-
-    const [order] = await tx
-      .insert(orders)
-      .values({
-        userId,
-        idempotencyKey: body.idempotencyKey,
-        status: 'pending',
-        paymentMethod: body.paymentMethod,
-        subtotalCents: pricing.subtotalCents,
-        shippingCents,
-        taxCents: pricing.taxCents,
-        totalCents: pricing.totalCents,
-        taxRateBasisPoints: pricing.rate,
-        pricesIncludeTax: pricing.pricesIncludeTax,
-        recipientName: address.recipientName,
-        phone: address.phone,
-        line1: address.line1,
-        line2: address.line2,
-        barangay: address.barangay,
-        city: address.city,
-        province: address.province,
-        postalCode: address.postalCode,
-      })
-      .returning();
-    if (!order) throw new AppError(500, 'Failed to create order');
-
-    const assetIds = await findItemAssets(tx, items);
-
-    await tx.insert(orderItems).values(
-      pricing.lines.map((line) => ({
-        orderId: order.id,
-        variantId: line.variantId,
-        assetId: assetIds.get(line.variantId),
-        productName: line.productName,
-        option1Name: line.option1Name,
-        option1Value: line.option1Value,
-        option2Name: line.option2Name,
-        option2Value: line.option2Value,
-        unitPriceCents: line.unitPriceCents,
-        quantity: line.quantity,
-        taxCents: line.taxCents,
-        lineTotalCents: line.lineTotalCents,
-      })),
-    );
+    const order = await placeOrder(tx, { ...body, owner: { userId }, address, items });
 
     await tx.delete(cartItems).where(eq(cartItems.userId, userId));
 
     return { order: toPublicOrder(order, await findItems(tx, [order.id])), created: true };
+  });
+}
+
+/** Guests have no cart or saved address, so the request carries both. */
+export async function createGuestOrder(body: GuestOrderBody) {
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(orders).where(guestOrderKey(body));
+
+      if (existing) return { order: await toGuestOrder(tx, existing), created: false };
+
+      const items = await findGuestItems(tx, body.items);
+      const order = await placeOrder(tx, {
+        ...body,
+        owner: { guestEmail: body.email },
+        items,
+      });
+
+      return { order: await toGuestOrder(tx, order), created: true };
+    });
+  } catch (error) {
+    // Two parallel retries with one key: the loser returns the order the winner made.
+    if (!hasDbErrorCode(error, UNIQUE_VIOLATION)) throw error;
+
+    const [existing] = await db.select().from(orders).where(guestOrderKey(body));
+
+    if (!existing) throw error;
+
+    return { order: await toGuestOrder(db, existing), created: false };
+  }
+}
+
+async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
+  const { owner, address, items, paymentMethod, expectedTotalCents, idempotencyKey } = input;
+  const isUnpaidOnPlacing = paymentMethod !== 'cod';
+
+  if (isUnpaidOnPlacing && !paymentDetails(paymentMethod)) {
+    throw new AppError(409, 'This payment method is not available');
+  }
+
+  const unavailable = items.filter((item) => !item.variantActive || !item.productActive);
+
+  if (unavailable.length > 0) {
+    throw checkoutError('Some items are no longer available', unavailable, 'is unavailable');
+  }
+
+  const shippingCents = await calculateShipping(items, address);
+  const pricing = priceOrder(items, shippingCents);
+
+  if (pricing.totalCents !== expectedTotalCents) {
+    throw new AppError(409, 'The order total has changed');
+  }
+
+  await reduceStock(tx, items);
+
+  const [order] = await tx
+    .insert(orders)
+    .values({
+      ...owner,
+      idempotencyKey,
+      status: isUnpaidOnPlacing ? 'awaiting_payment' : 'pending',
+      paymentMethod,
+      paymentDueAt: isUnpaidOnPlacing
+        ? new Date(Date.now() + env.PAYMENT_WINDOW_HOURS * 60 * 60 * 1000)
+        : null,
+      subtotalCents: pricing.subtotalCents,
+      shippingCents,
+      taxCents: pricing.taxCents,
+      totalCents: pricing.totalCents,
+      taxRateBasisPoints: pricing.rate,
+      pricesIncludeTax: pricing.pricesIncludeTax,
+      recipientName: address.recipientName,
+      phone: address.phone,
+      line1: address.line1,
+      line2: address.line2 ?? '',
+      barangay: address.barangay,
+      city: address.city,
+      province: address.province,
+      postalCode: address.postalCode,
+    })
+    .returning();
+  if (!order) throw new AppError(500, 'Failed to create order');
+
+  const assetIds = await findItemAssets(tx, items);
+
+  await tx.insert(orderItems).values(
+    pricing.lines.map((line) => ({
+      orderId: order.id,
+      variantId: line.variantId,
+      assetId: assetIds.get(line.variantId),
+      productName: line.productName,
+      option1Name: line.option1Name,
+      option1Value: line.option1Value,
+      option2Name: line.option2Name,
+      option2Value: line.option2Value,
+      unitPriceCents: line.unitPriceCents,
+      quantity: line.quantity,
+      taxCents: line.taxCents,
+      lineTotalCents: line.lineTotalCents,
+    })),
+  );
+
+  return order;
+}
+
+export async function getGuestOrder(token: string) {
+  const id = readGuestToken(token);
+  const [order] = id ? await db.select().from(orders).where(guestOrderById(id)) : [];
+
+  if (!order) notFound('guest order');
+
+  return toGuestOrder(db, order);
+}
+
+export async function submitOwnPayment(userId: string, id: string, reference: string) {
+  return lockOrder(and(eq(orders.id, id), eq(orders.userId, userId)), id, async (tx, order) => {
+    const updated = await submitPayment(tx, order, reference);
+    return toPublicOrder(updated, await findItems(tx, [id]));
+  });
+}
+
+export async function submitGuestPayment(token: string, reference: string) {
+  const id = readGuestToken(token);
+
+  if (!id) notFound('guest order');
+
+  return lockOrder(guestOrderById(id), id, async (tx, order) => {
+    const updated = await submitPayment(tx, order, reference);
+    return toGuestOrder(tx, updated);
+  });
+}
+
+async function submitPayment(tx: Transaction, order: Order, reference: string) {
+  if (order.status !== 'awaiting_payment' || order.paymentStatus !== 'unpaid') {
+    throw new AppError(409, 'This order is not waiting for a payment reference');
+  }
+
+  try {
+    // The method is the provider for now. A payment provider would use its own name.
+    await tx.insert(payments).values({
+      orderId: order.id,
+      method: order.paymentMethod,
+      amountCents: order.totalCents,
+      provider: order.paymentMethod,
+      reference,
+    });
+  } catch (error) {
+    if (hasDbErrorCode(error, UNIQUE_VIOLATION)) {
+      throw new AppError(409, 'This payment reference has already been used');
+    }
+    throw error;
+  }
+
+  const [updated] = await tx
+    .update(orders)
+    .set({ paymentStatus: 'submitted' })
+    .where(eq(orders.id, order.id))
+    .returning();
+
+  return updated ?? notFound(order.id);
+}
+
+export async function confirmPayment(id: string) {
+  await lockOrder(eq(orders.id, id), id, async (tx, order) => {
+    if (order.paymentStatus !== 'submitted') {
+      throw new AppError(409, 'This order has no payment waiting for confirmation');
+    }
+
+    await markPaid(tx, id);
+  });
+
+  return getAnyOrder(id);
+}
+
+export async function rejectPayment(id: string) {
+  await lockOrder(eq(orders.id, id), id, async (tx, order) => {
+    if (order.paymentStatus !== 'submitted') {
+      throw new AppError(409, 'This order has no payment waiting for confirmation');
+    }
+
+    await cancelOrder(tx, order);
+  });
+
+  return getAnyOrder(id);
+}
+
+/** Records a refund made outside the system. Unfinished orders must be cancelled first. */
+export async function refundPayment(id: string) {
+  await lockOrder(eq(orders.id, id), id, async (tx, order) => {
+    if (order.paymentStatus !== 'paid') {
+      throw new AppError(409, 'Only a paid order can be refunded');
+    }
+
+    if (!['cancelled', 'returned', 'delivered'].includes(order.status)) {
+      throw new AppError(409, 'Cancel this order before refunding it');
+    }
+
+    await tx.update(orders).set({ paymentStatus: 'refunded' }).where(eq(orders.id, id));
+  });
+
+  return getAnyOrder(id);
+}
+
+/** Cancels unpaid orders past their deadline. Orders with a submitted reference are left alone. */
+export async function expireUnpaidOrders() {
+  return db.transaction(async (tx) => {
+    // SKIP LOCKED lets several servers run this without blocking or repeating each other.
+    const expired = await tx
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.status, 'awaiting_payment'),
+          eq(orders.paymentStatus, 'unpaid'),
+          lte(orders.paymentDueAt, new Date()),
+        ),
+      )
+      .limit(EXPIRY_BATCH_SIZE)
+      .for('update', { skipLocked: true });
+
+    for (const order of expired) {
+      await cancelOrder(tx, order);
+    }
+
+    return expired.length;
   });
 }
 
@@ -253,33 +483,29 @@ export async function getOrder(userId: string, id: string) {
 }
 
 export async function cancelOwnOrder(userId: string, id: string) {
-  return db.transaction(async (tx) => {
-    const [order] = await tx
-      .select()
-      .from(orders)
-      .where(and(eq(orders.id, id), eq(orders.userId, userId)))
-      .for('update');
+  return lockOrder(and(eq(orders.id, id), eq(orders.userId, userId)), id, async (tx, order) => {
+    const isUnpaid = order.status === 'awaiting_payment' && order.paymentStatus === 'unpaid';
 
-    if (!order) notFound(id);
-
-    if (order.status !== 'pending') {
+    if (order.status !== 'pending' && !isUnpaid) {
       throw new AppError(409, 'This order can no longer be cancelled');
     }
 
-    const cancelled = await cancelOrder(tx, order);
-
-    return toPublicOrder(cancelled, await findItems(tx, [id]));
+    return toPublicOrder(await cancelOrder(tx, order), await findItems(tx, [id]));
   });
 }
 
-export async function listAllOrders({ page, limit, status }: ListOrdersQuery) {
-  const where = status ? eq(orders.status, status) : undefined;
+export async function listAllOrders({ page, limit, status, paymentStatus }: ListOrdersQuery) {
+  const where = and(
+    status ? eq(orders.status, status) : undefined,
+    paymentStatus ? eq(orders.paymentStatus, paymentStatus) : undefined,
+  );
 
   const [rows, totals] = await Promise.all([
     db
       .select(adminOrderFields)
       .from(orders)
       .leftJoin(users, eq(orders.userId, users.id))
+      .leftJoin(payments, eq(payments.orderId, orders.id))
       .where(where)
       .orderBy(desc(orders.createdAt), desc(orders.id))
       .limit(limit)
@@ -303,6 +529,7 @@ export async function getAnyOrder(id: string) {
     .select(adminOrderFields)
     .from(orders)
     .leftJoin(users, eq(orders.userId, users.id))
+    .leftJoin(payments, eq(payments.orderId, orders.id))
     .where(eq(orders.id, id));
 
   if (!order) notFound(id);
@@ -311,11 +538,7 @@ export async function getAnyOrder(id: string) {
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
-  await db.transaction(async (tx) => {
-    const [order] = await tx.select().from(orders).where(eq(orders.id, id)).for('update');
-
-    if (!order) notFound(id);
-
+  await lockOrder(eq(orders.id, id), id, async (tx, order) => {
     if (!adminTransitions[order.status]?.includes(status)) {
       throw new AppError(409, `An order cannot move from ${order.status} to ${status}`);
     }
@@ -337,9 +560,32 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   return getAnyOrder(id);
 }
 
-/** The only way an order becomes paid, so that a provider's webhook can use it later. */
+/**
+ * The only way an order becomes paid, so that a provider's webhook can use it later.
+ * Repeating it changes nothing, as providers can deliver the same event twice.
+ */
 export async function markPaid(tx: Transaction, orderId: string) {
-  await tx.update(orders).set({ paymentStatus: 'paid' }).where(eq(orders.id, orderId));
+  await tx
+    .update(orders)
+    .set({
+      paymentStatus: 'paid',
+      paymentDueAt: null,
+      status: sql`case when ${orders.status} = 'awaiting_payment' then 'pending'::order_status else ${orders.status} end`,
+    })
+    .where(and(eq(orders.id, orderId), ne(orders.paymentStatus, 'paid')));
+}
+
+/** Locks one order row, so that its status, payment, and stock change only once. */
+function lockOrder<T>(
+  where: SQL | undefined,
+  id: string,
+  work: (tx: Transaction, order: Order) => Promise<T>,
+) {
+  return db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(where).for('update');
+
+    return order ? work(tx, order) : notFound(id);
+  });
 }
 
 /** Expects the order row to be locked, so that stock is only returned once. */
@@ -359,27 +605,35 @@ async function cancelOrder(tx: Transaction, order: Order) {
 
   const [cancelled] = await tx
     .update(orders)
-    .set({ status: 'cancelled' })
+    .set({
+      status: 'cancelled',
+      paymentDueAt: null,
+      paymentStatus: order.paymentStatus === 'submitted' ? 'unpaid' : order.paymentStatus,
+    })
     .where(eq(orders.id, order.id))
     .returning();
 
   return cancelled ?? notFound(order.id);
 }
 
+const checkoutItemFields = {
+  variantId: productVariants.id,
+  productId: products.id,
+  productName: products.name,
+  option1Name: products.option1Name,
+  option1Value: productVariants.option1Value,
+  option2Name: products.option2Name,
+  option2Value: productVariants.option2Value,
+  unitPriceCents: productVariants.priceCents,
+  variantAssetId: productVariants.assetId,
+  variantActive: productVariants.active,
+  productActive: products.active,
+};
+
 function findCheckoutItems(tx: Transaction, userId: string) {
   return tx
     .select({
-      variantId: productVariants.id,
-      productId: products.id,
-      productName: products.name,
-      option1Name: products.option1Name,
-      option1Value: productVariants.option1Value,
-      option2Name: products.option2Name,
-      option2Value: productVariants.option2Value,
-      unitPriceCents: productVariants.priceCents,
-      variantAssetId: productVariants.assetId,
-      variantActive: productVariants.active,
-      productActive: products.active,
+      ...checkoutItemFields,
       quantity: cartItems.quantity,
     })
     .from(cartItems)
@@ -390,6 +644,35 @@ function findCheckoutItems(tx: Transaction, userId: string) {
 }
 
 type CheckoutItem = Awaited<ReturnType<typeof findCheckoutItems>>[number];
+
+async function findGuestItems(tx: Transaction, requested: CartItemInput[]) {
+  const rows = await tx
+    .select(checkoutItemFields)
+    .from(productVariants)
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(
+      inArray(
+        productVariants.id,
+        requested.map((item) => item.variantId),
+      ),
+    )
+    .orderBy(asc(productVariants.id));
+
+  const missing = requested.filter((item) => !rows.some((row) => row.variantId === item.variantId));
+
+  if (missing.length > 0) {
+    throw new AppError(
+      409,
+      'Some items are no longer available',
+      missing.map((item) => ({ field: item.variantId, message: 'This item is unavailable' })),
+    );
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    quantity: requested.find((item) => item.variantId === row.variantId)?.quantity ?? 0,
+  }));
+}
 
 /** Items arrive sorted by variant, so parallel checkouts cannot deadlock on each other. */
 async function reduceStock(tx: Transaction, items: CheckoutItem[]) {
@@ -442,11 +725,23 @@ async function findItemAssets(tx: Transaction, items: CheckoutItem[]) {
   );
 }
 
-function toAdminOrder(row: Order & { customerEmail: string | null }, items: ItemRow[]) {
+function toAdminOrder(
+  row: Order & { customerEmail: string | null; paymentReference: string | null },
+  items: ItemRow[],
+) {
   return {
     ...toPublicOrder(row, items),
     userId: row.userId,
-    customerEmail: row.customerEmail,
+    isGuest: row.guestEmail !== null,
+    customerEmail: row.customerEmail ?? row.guestEmail,
+    paymentReference: row.paymentReference,
+  };
+}
+
+async function toGuestOrder(database: Database, order: Order) {
+  return {
+    ...toPublicOrder(order, await findItems(database, [order.id])),
+    guestToken: `${order.id}.${signGuestOrder(order.id)}`,
   };
 }
 

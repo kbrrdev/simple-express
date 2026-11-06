@@ -1,9 +1,16 @@
 import type { Request, Response } from 'express';
 import type { CartItemsBody } from '../cart/cart.validation';
 import * as orderService from './order.service';
-import type { CreateOrderBody, ListOrdersQuery, UpdateOrderStatusBody } from './order.validation';
+import type {
+  CreateOrderBody,
+  GuestOrderBody,
+  ListOrdersQuery,
+  SubmitPaymentBody,
+  UpdateOrderStatusBody,
+} from './order.validation';
 
 type IdParams = { id: string };
+type TokenParams = { token: string };
 
 export async function preview(req: Request<object, object, CartItemsBody>, res: Response) {
   res.json({ data: await orderService.previewOrder(req.body.items) });
@@ -16,6 +23,50 @@ export async function create(req: Request<object, object, CreateOrderBody>, res:
     .status(created ? 201 : 200)
     .location(`${req.baseUrl}/${order.id}`)
     .json({ data: order });
+}
+
+export async function createGuest(req: Request<object, object, GuestOrderBody>, res: Response) {
+  const { order, created } = await orderService.createGuestOrder(req.body);
+
+  res.set('Cache-Control', 'no-store');
+  res.status(created ? 201 : 200).json({ data: order });
+}
+
+export async function getGuest(req: Request<TokenParams>, res: Response) {
+  res.set('Cache-Control', 'no-store');
+  res.json({ data: await orderService.getGuestOrder(req.params.token) });
+}
+
+export async function submitGuestPayment(
+  req: Request<TokenParams, object, SubmitPaymentBody>,
+  res: Response,
+) {
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    data: await orderService.submitGuestPayment(req.params.token, req.body.reference),
+  });
+}
+
+export async function submitPayment(
+  req: Request<IdParams, object, SubmitPaymentBody>,
+  res: Response,
+) {
+  const { userId } = res.locals.auth;
+  res.json({
+    data: await orderService.submitOwnPayment(userId, req.params.id, req.body.reference),
+  });
+}
+
+export async function confirmPayment(req: Request<IdParams>, res: Response) {
+  res.json({ data: await orderService.confirmPayment(req.params.id) });
+}
+
+export async function rejectPayment(req: Request<IdParams>, res: Response) {
+  res.json({ data: await orderService.rejectPayment(req.params.id) });
+}
+
+export async function refundPayment(req: Request<IdParams>, res: Response) {
+  res.json({ data: await orderService.refundPayment(req.params.id) });
 }
 
 export async function list(req: Request, res: Response) {

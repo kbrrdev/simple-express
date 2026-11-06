@@ -347,10 +347,9 @@ describe('checkout', () => {
     await checkout(122000, { paymentStatus: 'paid' }).expect(400);
   });
 
-  it('only accepts COD for now', async () => {
+  it('rejects an unknown payment method', async () => {
     await addToCart(medium, 1);
 
-    await checkout(122000, { paymentMethod: 'gcash' }).expect(400);
     await checkout(122000, { paymentMethod: 'free' }).expect(400);
   });
 

@@ -128,6 +128,7 @@ function requestBody({ requestBody }: Operation) {
 }
 
 function pathVariableValue(name: string, tag: string) {
+  if (name === 'token') return '{{guestToken}}';
   return `{{${name === 'id' ? idVariablesByTag[tag] : name}}}`;
 }
 
@@ -160,6 +161,14 @@ function testScript(path: string) {
       '  const { accessToken, refreshToken } = pm.response.json().data;',
       "  pm.collectionVariables.set('accessToken', accessToken);",
       "  if (refreshToken) pm.collectionVariables.set('refreshToken', refreshToken);",
+      '}',
+    ];
+  }
+
+  if (path === '/api/orders/guest') {
+    return [
+      'if (pm.response.code === 201) {',
+      "  pm.collectionVariables.set('guestToken', pm.response.json().data.guestToken);",
       '}',
     ];
   }
@@ -231,6 +240,7 @@ export function buildPostmanCollection() {
         'blogId',
         'categoryId',
         'expectedTotalCents',
+        'guestToken',
         'imageId',
         'orderId',
         'productId',

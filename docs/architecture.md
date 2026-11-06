@@ -160,7 +160,10 @@ Blogs are public to read. Only admins can create, update, and delete them.
 - Checkout runs in one transaction. It locks the user, handles repeated `idempotencyKey` values, reads prices from the database, compares the total with `expectedTotalCents`, reduces stock with a conditional update in variant order, then saves the order and empties the cart.
 - Queries inside the transaction use its connection, so that a burst of checkouts cannot exhaust the pool.
 - Status changes lock the order row, so that stock is only returned once. `adminTransitions` in `order.service.ts` lists the allowed moves.
-- `markPaid` is the only way an order becomes paid, and `calculateShipping` is the only place that sets the fee.
+- `markPaid` is the only way an order becomes paid, and is safe to repeat, so a future webhook can use it. `calculateShipping` is the only place that sets the fee.
+- GCash and bank transfer orders start as `awaiting_payment`, and a row in `payments` records the reference. The unique provider and reference stop a payment being counted twice.
+- `expireUnpaidOrders` runs every 5 minutes from `index.ts`. It uses `FOR UPDATE SKIP LOCKED`, so several servers can run it safely, and it skips orders with a submitted reference.
+- Guest orders have a `guest_email` and no `user_id`, and are never linked to accounts. Their `guestToken` is the order ID with an HMAC signature, so a retry can return the same link without storing it. Changing `JWT_SECRET` invalidates these links.
 - Tax is calculated per line and on shipping. `TAX_RATE_PERCENT` and `PRICES_INCLUDE_TAX` set it, and both are saved on each order.
 
 ## Addresses

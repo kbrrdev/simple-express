@@ -37,10 +37,12 @@ export const orders = pgTable(
     orderNumber: integer('order_number').notNull().generatedAlwaysAsIdentity(),
     // Kept when a user is deleted, as orders are business records.
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    guestEmail: varchar('guest_email', { length: 255 }),
     idempotencyKey: uuid('idempotency_key').notNull(),
     status: orderStatus().notNull(),
     paymentMethod: paymentMethod('payment_method').notNull(),
     paymentStatus: paymentStatus('payment_status').notNull().default('unpaid'),
+    paymentDueAt: timestamp('payment_due_at', { withTimezone: true }),
     subtotalCents: integer('subtotal_cents').notNull(),
     shippingCents: integer('shipping_cents').notNull(),
     taxCents: integer('tax_cents').notNull(),
@@ -64,8 +66,10 @@ export const orders = pgTable(
   (table) => [
     unique('orders_order_number_unique').on(table.orderNumber),
     unique('orders_user_idempotency_key_unique').on(table.userId, table.idempotencyKey),
+    unique('orders_guest_idempotency_key_unique').on(table.guestEmail, table.idempotencyKey),
     index('orders_user_id_created_at_idx').on(table.userId, table.createdAt),
     index('orders_status_idx').on(table.status),
+    index('orders_payment_due_at_idx').on(table.paymentDueAt),
     check('orders_total_cents_non_negative', sql`${table.totalCents} >= 0`),
   ],
 );
@@ -93,6 +97,31 @@ export const orderItems = pgTable(
     lineTotalCents: integer('line_total_cents').notNull(),
   },
   (table) => [index('order_items_order_id_idx').on(table.orderId)],
+);
+
+export const payments = pgTable(
+  'payments',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    method: paymentMethod().notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    // Enough for a future provider: its name, its reference, and its own raw status.
+    provider: varchar({ length: 50 }).notNull(),
+    reference: varchar({ length: 100 }).notNull(),
+    providerStatus: varchar('provider_status', { length: 50 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    unique('payments_order_id_unique').on(table.orderId),
+    unique('payments_provider_reference_unique').on(table.provider, table.reference),
+  ],
 );
 
 export type Order = typeof orders.$inferSelect;
