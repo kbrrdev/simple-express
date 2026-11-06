@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { assets } from '../assets/asset.schema';
 import { users } from '../auth/auth.schema';
+import { paymentMethods } from '../payment-methods/payment-method.schema';
 import { productVariants } from '../products/product.schema';
 
 // These belong to the store. A future payment provider's statuses are mapped onto them.
@@ -28,7 +29,7 @@ export const orderStatus = pgEnum('order_status', [
 
 export const paymentStatus = pgEnum('payment_status', ['unpaid', 'submitted', 'paid', 'refunded']);
 
-export const paymentMethod = pgEnum('payment_method', ['cod', 'gcash', 'bank_transfer']);
+export const paymentType = pgEnum('payment_type', ['cod', 'manual']);
 
 export const orders = pgTable(
   'orders',
@@ -40,7 +41,17 @@ export const orders = pgTable(
     guestEmail: varchar('guest_email', { length: 255 }),
     idempotencyKey: uuid('idempotency_key').notNull(),
     status: orderStatus().notNull(),
-    paymentMethod: paymentMethod('payment_method').notNull(),
+    paymentType: paymentType('payment_type').notNull(),
+    paymentMethodId: uuid('payment_method_id').references(() => paymentMethods.id, {
+      onDelete: 'restrict',
+    }),
+    // Copied, so that a customer keeps seeing the account they were told to pay.
+    paymentProvider: varchar('payment_provider', { length: 100 }),
+    paymentAccountName: varchar('payment_account_name', { length: 100 }),
+    paymentAccountNumber: varchar('payment_account_number', { length: 100 }),
+    paymentQrAssetId: uuid('payment_qr_asset_id').references(() => assets.id, {
+      onDelete: 'restrict',
+    }),
     paymentStatus: paymentStatus('payment_status').notNull().default('unpaid'),
     paymentDueAt: timestamp('payment_due_at', { withTimezone: true }),
     subtotalCents: integer('subtotal_cents').notNull(),
@@ -106,7 +117,6 @@ export const payments = pgTable(
     orderId: uuid('order_id')
       .notNull()
       .references(() => orders.id, { onDelete: 'cascade' }),
-    method: paymentMethod().notNull(),
     amountCents: integer('amount_cents').notNull(),
     // Enough for a future provider: its name, its reference, and its own raw status.
     provider: varchar({ length: 50 }).notNull(),

@@ -13,7 +13,7 @@ export interface ListOrdersQuery {
 
 export interface CreateOrderBody {
   addressId: string;
-  paymentMethod: 'cod' | 'gcash' | 'bank_transfer';
+  paymentMethod: string;
   expectedTotalCents: number;
   idempotencyKey: string;
 }
@@ -22,7 +22,7 @@ export interface GuestOrderBody {
   email: string;
   address: AddressBody;
   items: CartItemInput[];
-  paymentMethod: 'gcash' | 'bank_transfer';
+  paymentMethod: string;
   expectedTotalCents: number;
   idempotencyKey: string;
 }
@@ -64,7 +64,7 @@ export const listOrdersQuery = Joi.object<ListOrdersQuery>({
 
 export const createOrderBody = Joi.object<CreateOrderBody>({
   addressId: Joi.string().uuid().required(),
-  paymentMethod: Joi.string().valid('cod', 'gcash', 'bank_transfer').required(),
+  paymentMethod: Joi.alternatives(Joi.string().valid('cod'), Joi.string().uuid()).required(),
   expectedTotalCents: Joi.number().integer().min(0).required(),
   idempotencyKey: Joi.string().uuid().required(),
 });
@@ -74,7 +74,7 @@ export const guestOrderBody = Joi.object<GuestOrderBody>({
   address: createAddressBody.required(),
   items: cartItemsList.min(1).required(),
   // Guests cannot pay by COD, as anonymous orders invite fake ones.
-  paymentMethod: Joi.string().valid('gcash', 'bank_transfer').required(),
+  paymentMethod: Joi.string().uuid().required(),
   expectedTotalCents: Joi.number().integer().min(0).required(),
   idempotencyKey: Joi.string().uuid().required(),
 });

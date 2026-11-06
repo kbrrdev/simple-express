@@ -242,7 +242,7 @@ describe('checkout', () => {
     expect(response.headers.location).toBe(`/api/orders/${data.id}`);
     expect(data).toMatchObject({
       status: 'pending',
-      paymentMethod: 'cod',
+      paymentType: 'cod',
       paymentStatus: 'unpaid',
       subtotalCents: 112000,
       shippingCents: 10000,
@@ -347,10 +347,11 @@ describe('checkout', () => {
     await checkout(122000, { paymentStatus: 'paid' }).expect(400);
   });
 
-  it('rejects an unknown payment method', async () => {
+  it('rejects a bad payment method', async () => {
     await addToCart(medium, 1);
 
     await checkout(122000, { paymentMethod: 'free' }).expect(400);
+    await checkout(122000, { paymentMethod: 'gcash' }).expect(400);
   });
 
   it('rejects a bad body', async () => {

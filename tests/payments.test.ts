@@ -5,7 +5,15 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { app } from '../src/app';
 import { env } from '../src/config/env';
 import { db, pool } from '../src/db';
-import { categories, orders, payments, products, productVariants, users } from '../src/db/schema';
+import {
+  categories,
+  orders,
+  paymentMethods,
+  payments,
+  products,
+  productVariants,
+  users,
+} from '../src/db/schema';
 import { guestOrderLimiter } from '../src/modules/orders/order.routes';
 import { expireUnpaidOrders, markPaid } from '../src/modules/orders/order.service';
 
@@ -32,6 +40,10 @@ let otherToken: string;
 let addressId: string;
 let otherAddressId: string;
 let variantId: string;
+let gcashId: string;
+let bankId: string;
+
+const methodIds = () => ({ cod: 'cod', gcash: gcashId, bank_transfer: bankId });
 
 async function registerAndLogin(email: string) {
   await api().post('/api/auth/register').send({ email, password }).expect(201);
@@ -49,7 +61,11 @@ async function resetGuestLimit() {
   }
 }
 
-async function placeOrder(paymentMethod = 'gcash', user = token, addressForUser = addressId) {
+async function placeOrder(
+  method: 'cod' | 'gcash' | 'bank_transfer' = 'gcash',
+  user = token,
+  addressForUser = addressId,
+) {
   await api()
     .post('/api/cart/items')
     .set(bearer(user))
@@ -61,7 +77,7 @@ async function placeOrder(paymentMethod = 'gcash', user = token, addressForUser 
     .set(bearer(user))
     .send({
       addressId: addressForUser,
-      paymentMethod,
+      paymentMethod: methodIds()[method],
       expectedTotalCents: total,
       idempotencyKey: randomUUID(),
     })
@@ -74,7 +90,7 @@ const guestBody = (overrides: object = {}) => ({
   email: 'guest@example.com',
   address,
   items: [{ variantId, quantity: 1 }],
-  paymentMethod: 'gcash',
+  paymentMethod: gcashId,
   expectedTotalCents: total,
   idempotencyKey: randomUUID(),
   ...overrides,
@@ -126,7 +142,9 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.execute(sql`truncate table categories, products, addresses, orders cascade`);
+  await db.execute(
+    sql`truncate table categories, products, addresses, orders, payment_methods cascade`,
+  );
   await resetGuestLimit();
 
   const [category] = await db.insert(categories).values({ name: 'Shirts' }).returning();
@@ -145,6 +163,17 @@ beforeEach(async () => {
   if (!variant) throw new Error('Failed to insert variant');
   variantId = variant.id;
 
+  const [gcash, bank] = await db
+    .insert(paymentMethods)
+    .values([
+      { providerName: 'GCash', accountName: 'Juan Dela Cruz', accountNumber: '09170000000' },
+      { providerName: 'BDO', accountName: 'Juan Dela Cruz', accountNumber: '1234567890' },
+    ])
+    .returning();
+  if (!gcash || !bank) throw new Error('Failed to insert payment methods');
+  gcashId = gcash.id;
+  bankId = bank.id;
+
   addressId = (await api().post('/api/addresses').set(bearer(token)).send(address).expect(201)).body
     .data.id;
   otherAddressId = (
@@ -153,8 +182,6 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  env.PAYMENT_GCASH_NUMBER = '09170000000';
-  env.PAYMENT_BANK_DETAILS = 'Test Bank 1234567890';
   env.PAYMENT_WINDOW_HOURS = 24;
 });
 
@@ -168,16 +195,17 @@ describe('placing a manual payment order', () => {
 
     expect(order).toMatchObject({
       status: 'awaiting_payment',
-      paymentMethod: 'gcash',
+      paymentType: 'manual',
+      paymentProvider: 'GCash',
       paymentStatus: 'unpaid',
-      paymentDetails: '09170000000',
     });
+    expect(order.payment.accountNumber).toBe('09170000000');
   });
 
   it('shows bank details for a bank transfer', async () => {
     const order = await placeOrder('bank_transfer');
 
-    expect(order.paymentDetails).toBe('Test Bank 1234567890');
+    expect(order.payment).toMatchObject({ providerName: 'BDO', accountNumber: '1234567890' });
   });
 
   it('holds stock and sets the deadline from the setting', async () => {
@@ -195,30 +223,7 @@ describe('placing a manual payment order', () => {
   it('gives COD orders no deadline or details', async () => {
     const order = await placeOrder('cod');
 
-    expect(order).toMatchObject({ status: 'pending', paymentDueAt: null, paymentDetails: null });
-  });
-
-  it('rejects a method with no details configured', async () => {
-    env.PAYMENT_GCASH_NUMBER = undefined;
-    await api()
-      .post('/api/cart/items')
-      .set(bearer(token))
-      .send({ variantId, quantity: 1 })
-      .expect(200);
-
-    const response = await api()
-      .post('/api/orders')
-      .set(bearer(token))
-      .send({
-        addressId,
-        paymentMethod: 'gcash',
-        expectedTotalCents: total,
-        idempotencyKey: randomUUID(),
-      })
-      .expect(409);
-
-    expect(response.body.error.message).toBe('This payment method is not available');
-    expect(await stock()).toBe(10);
+    expect(order).toMatchObject({ status: 'pending', paymentDueAt: null, payment: null });
   });
 
   it('can be cancelled by the customer while unpaid, returning stock', async () => {
@@ -272,8 +277,7 @@ describe('submitting a reference', () => {
 
     expect(payment).toMatchObject({
       orderId: order.id,
-      method: 'bank_transfer',
-      provider: 'bank_transfer',
+      provider: 'BDO',
       amountCents: total,
       reference: 'BANK-0001',
     });
@@ -309,7 +313,7 @@ describe('submitting a reference', () => {
     expect((await getAdminOrder(second.id)).paymentStatus).toBe('unpaid');
   });
 
-  it('allows the same reference with a different method', async () => {
+  it('allows the same reference with a different provider', async () => {
     const gcash = await placeOrder('gcash');
     const bank = await placeOrder('bank_transfer');
 
@@ -371,7 +375,7 @@ describe('confirming a payment', () => {
       status: 'pending',
       paymentStatus: 'paid',
       paymentDueAt: null,
-      paymentDetails: null,
+      payment: null,
     });
     expect(await stock()).toBe(9);
   });
@@ -623,7 +627,7 @@ describe('guest checkout', () => {
   it('creates an order with no account', async () => {
     const order = await placeGuestOrder();
 
-    expect(order).toMatchObject({ status: 'awaiting_payment', paymentMethod: 'gcash' });
+    expect(order).toMatchObject({ status: 'awaiting_payment', paymentProvider: 'GCash' });
     expect(order.guestToken).toContain(`${order.id}.`);
     expect(order.shippingAddress).toMatchObject({ phone: '+639171234567', line2: '' });
     expect(await stock()).toBe(9);
@@ -648,14 +652,15 @@ describe('guest checkout', () => {
 
   it('does not allow COD', async () => {
     await guestCheckout({ paymentMethod: 'cod' }).expect(400);
+    await guestCheckout({ paymentMethod: 'gcash' }).expect(400);
 
     expect(await stock()).toBe(10);
   });
 
   it('accepts a bank transfer', async () => {
-    const order = await placeGuestOrder({ paymentMethod: 'bank_transfer' });
+    const order = await placeGuestOrder({ paymentMethod: bankId });
 
-    expect(order.paymentDetails).toBe('Test Bank 1234567890');
+    expect(order.payment.providerName).toBe('BDO');
   });
 
   it('applies the address rules', async () => {

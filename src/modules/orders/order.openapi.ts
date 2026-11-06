@@ -140,7 +140,7 @@ export const orderPaths = {
       tags,
       summary: 'Check out as a guest',
       description:
-        'Guests pay by GCash or bank transfer only. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.',
+        'Guests cannot use COD. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.',
       requestBody: jsonBody('CreateGuestOrder'),
       responses: {
         200: { description: 'The original order', content: dataContent('GuestOrder') },
@@ -270,7 +270,7 @@ export const orderPaths = {
     post: {
       tags,
       summary: 'Submit a payment reference',
-      description: 'Used after paying by GCash or bank transfer. An admin then checks it.',
+      description: 'Used after paying a manual method. An admin then checks it.',
       security,
       parameters: [orderId],
       requestBody: jsonBody('SubmitPayment'),
@@ -338,10 +338,11 @@ const orderRequired = [
   'id',
   'orderNumber',
   'status',
-  'paymentMethod',
+  'paymentType',
+  'paymentProvider',
   'paymentStatus',
   'paymentDueAt',
-  'paymentDetails',
+  'payment',
   'subtotalCents',
   'shippingCents',
   'vatableCents',
@@ -359,16 +360,24 @@ const orderProperties = {
   id: { type: 'string', format: 'uuid' },
   orderNumber: { type: 'string', example: 'ORD-000123' },
   status: { type: 'string', enum: statuses },
-  paymentMethod: { type: 'string', enum: ['cod', 'gcash', 'bank_transfer'] },
+  paymentType: { type: 'string', enum: ['cod', 'manual'] },
+  paymentProvider: { type: ['string', 'null'], example: 'GCash' },
   paymentStatus: { type: 'string', enum: ['unpaid', 'submitted', 'paid', 'refunded'] },
   paymentDueAt: {
     type: ['string', 'null'],
     format: 'date-time',
     description: 'When an unpaid order is cancelled',
   },
-  paymentDetails: {
-    type: ['string', 'null'],
-    description: 'Where to send payment, while the order is waiting for it',
+  payment: {
+    type: ['object', 'null'],
+    description: 'Who to pay, while the order is waiting for payment',
+    required: ['providerName', 'accountName', 'accountNumber', 'qrUrl'],
+    properties: {
+      providerName: { type: ['string', 'null'], example: 'GCash' },
+      accountName: { type: ['string', 'null'], example: 'Juan Dela Cruz' },
+      accountNumber: { type: ['string', 'null'], example: '09171234567' },
+      qrUrl: { type: ['string', 'null'], format: 'uri' },
+    },
   },
   ...totals,
   shippingAddress: {
@@ -500,7 +509,11 @@ export const orderSchemas = {
           },
         },
       },
-      paymentMethod: { type: 'string', enum: ['gcash', 'bank_transfer'] },
+      paymentMethod: {
+        type: 'string',
+        format: 'uuid',
+        description: 'A payment method id. Guests cannot use COD.',
+      },
       expectedTotalCents: { type: 'integer', minimum: 0 },
       idempotencyKey: { type: 'string', format: 'uuid' },
     },
@@ -525,7 +538,11 @@ export const orderSchemas = {
     additionalProperties: false,
     properties: {
       addressId: { type: 'string', format: 'uuid' },
-      paymentMethod: { type: 'string', enum: ['cod', 'gcash', 'bank_transfer'] },
+      paymentMethod: {
+        type: 'string',
+        description: '`cod`, or a payment method id from /api/payment-methods',
+        example: 'cod',
+      },
       expectedTotalCents: {
         type: 'integer',
         minimum: 0,
