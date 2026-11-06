@@ -38,9 +38,12 @@ const document = openApiDocument as unknown as {
 
 /** Lets a saved id flow into the following requests. */
 const bodyVariables: Record<string, string> = {
+  addressId: '{{addressId}}',
   assetId: '{{assetId}}',
   categoryId: '{{categoryId}}',
   coverAssetId: '{{assetId}}',
+  expectedTotalCents: '{{expectedTotalCents}}',
+  idempotencyKey: '{{$guid}}',
   refreshToken: '{{refreshToken}}',
   variantId: '{{variantId}}',
 };
@@ -50,6 +53,7 @@ const idVariablesByTag: Record<string, string> = {
   Assets: 'assetId',
   Blogs: 'blogId',
   Categories: 'categoryId',
+  Orders: 'orderId',
   Products: 'productId',
 };
 
@@ -58,6 +62,7 @@ const createdIdVariables: Record<string, string> = {
   '/api/assets': 'assetId',
   '/api/blogs': 'blogId',
   '/api/categories': 'categoryId',
+  '/api/orders': 'orderId',
   '/api/products': 'productId',
   '/api/products/{id}/images': 'imageId',
   '/api/products/{id}/variants': 'variantId',
@@ -159,6 +164,14 @@ function testScript(path: string) {
     ];
   }
 
+  if (path === '/api/orders/preview') {
+    return [
+      'if (pm.response.code === 200) {',
+      "  pm.collectionVariables.set('expectedTotalCents', pm.response.json().data.totalCents);",
+      '}',
+    ];
+  }
+
   const variable = createdIdVariables[path];
 
   if (!variable) return undefined;
@@ -217,7 +230,9 @@ export function buildPostmanCollection() {
         'assetId',
         'blogId',
         'categoryId',
+        'expectedTotalCents',
         'imageId',
+        'orderId',
         'productId',
         'variantId',
       ].map((key) => ({ key, value: '' })),

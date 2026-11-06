@@ -104,6 +104,7 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/blogs`      | Blogs module                  |
 | `/api/cart`       | Cart module                   |
 | `/api/categories` | Categories module             |
+| `/api/orders`     | Orders module                 |
 | `/api/products`   | Products module               |
 
 ## Database
@@ -152,6 +153,16 @@ Blogs are public to read. Only admins can create, update, and delete them.
 - Adding to the cart checks the quantity limit inside the upsert, so parallel requests cannot exceed it.
 - Guest carts are kept by the client. `POST /api/cart/preview` prices them, and `POST /api/cart/merge` moves them into the user's cart after login, keeping the higher quantity for items in both.
 
+## Orders
+
+- Orders copy the prices, product details, tax, and address they were placed with, so that later changes never alter them.
+- Order statuses, payment statuses, and payment methods are the store's own enums. A future payment provider's statuses are mapped onto them.
+- Checkout runs in one transaction. It locks the user, handles repeated `idempotencyKey` values, reads prices from the database, compares the total with `expectedTotalCents`, reduces stock with a conditional update in variant order, then saves the order and empties the cart.
+- Queries inside the transaction use its connection, so that a burst of checkouts cannot exhaust the pool.
+- Status changes lock the order row, so that stock is only returned once. `adminTransitions` in `order.service.ts` lists the allowed moves.
+- `markPaid` is the only way an order becomes paid, and `calculateShipping` is the only place that sets the fee.
+- Tax is calculated per line and on shipping. `TAX_RATE_PERCENT` and `PRICES_INCLUDE_TAX` set it, and both are saved on each order.
+
 ## Addresses
 
 - Addresses are limited to the Philippines, so there is no country column.
@@ -168,7 +179,7 @@ Blogs are public to read. Only admins can create, update, and delete them.
 - `src/lib/storage.ts` holds all file access. It uses S3 when `S3_BUCKET` is set, and otherwise writes to disk and serves files at `/uploads`.
 - `env.ts` rejects a partial S3 setup at startup, so that uploads never fall back to disk by accident.
 - A product has up to 10 rows in `product_images`, which hold the alt text and position. A variant's `asset_id` has a composite foreign key to `product_images`, which keeps the image on the same product and blocks removing it while in use.
-- Cart items use the variant's image, then the product's first image.
+- Cart and order items use the variant's image, then the product's first image. Order items also block deleting the asset.
 
 ## Validation
 
@@ -183,7 +194,7 @@ The `validate` middleware checks request bodies, parameters, and query strings a
 // List
 { "data": [], "meta": { "page": 1, "limit": 20, "total": 0 } }
 
-// Error (details are only present on validation errors)
+// Error (details are only present on validation errors and failed checkouts)
 { "error": { "message": "Validation failed", "details": [] } }
 ```
 

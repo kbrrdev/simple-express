@@ -12,6 +12,9 @@ interface Env {
   CORS_ORIGINS: string[];
   JWT_SECRET: string;
   PUBLIC_BASE_URL: string;
+  TAX_RATE_PERCENT: number;
+  PRICES_INCLUDE_TAX: boolean;
+  SHIPPING_FEE_CENTS: number;
   UPLOADS_DIR: string;
   S3_BUCKET?: string;
   S3_REGION?: string;
@@ -53,6 +56,9 @@ const envSchema = Joi.object<Env>({
   CORS_ORIGINS: Joi.string().empty('').default([]).custom(parseOrigins),
   JWT_SECRET: Joi.string().min(32).required(),
   PUBLIC_BASE_URL: url.default('http://localhost:3000'),
+  TAX_RATE_PERCENT: Joi.number().min(0).max(100).precision(2).empty('').default(12),
+  PRICES_INCLUDE_TAX: Joi.boolean().empty('').default(true),
+  SHIPPING_FEE_CENTS: Joi.number().integer().min(0).empty('').default(10000),
   UPLOADS_DIR: Joi.string().empty('').default('uploads'),
   S3_BUCKET: Joi.string().empty(''),
   S3_REGION: s3Setting,

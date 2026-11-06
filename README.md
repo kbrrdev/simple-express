@@ -139,6 +139,7 @@ src/
     ├── blogs/
     ├── cart/
     ├── categories/
+    ├── orders/
     └── products/
 
 drizzle/
@@ -364,6 +365,55 @@ The API does not store guest carts. The client keeps each item's `variantId` and
 3. Sends them to `/api/cart/merge`, then clears its local copy.
 
 A merge keeps the higher quantity for an item in both carts, so retrying one is safe. Quantities are reduced to the available stock, and unavailable variants are skipped. Both are listed in `adjustments` in the response, so the client can tell the customer.
+
+## Orders
+
+Logged-in customers check out their cart with cash on delivery. Tax and shipping are added at checkout, and an order keeps its own copy of its prices and address, so later changes never alter it.
+
+| Endpoint | Description | Access |
+|---|---|---|
+| `POST /api/orders/preview` | Price items with shipping and tax | Public |
+| `POST /api/orders` | Check out the cart | Customer |
+| `GET /api/orders` | List your orders | Customer |
+| `GET /api/orders/:id` | Get one of your orders | Customer |
+| `POST /api/orders/:id/cancel` | Cancel a pending order | Customer |
+| `GET /api/orders/admin` | List all orders | Admin |
+| `GET /api/orders/admin/:id` | Get any order | Admin |
+| `PATCH /api/orders/admin/:id/status` | Move an order to its next status | Admin |
+
+### Checking Out
+
+1. Call `/api/orders/preview` and show the customer the total.
+2. Call `POST /api/orders` with that total as `expectedTotalCents`, and a new `idempotencyKey`.
+3. If the request fails or times out, retry it with the same key. A repeated key returns the original order with `200`.
+
+Checkout returns `409` if the cart is empty, an item is unavailable or short of stock, or the total has changed. Stock is reduced here, in the same transaction that creates the order.
+
+### Statuses
+
+```text
+pending → confirmed → shipped → delivered
+   ↓          ↓          ↓
+cancelled  cancelled  returned
+```
+
+- Customers can cancel while an order is `pending`, and admins can also cancel `confirmed` orders. Cancelling returns stock.
+- `returned` does not return stock, as the item may be damaged. If it is fine, add it back by updating the variant.
+- A COD order becomes `paid` when it is marked `delivered`.
+
+### Tax and Shipping
+
+Set these in `.env`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `TAX_RATE_PERCENT` | `12` | Tax rate. Use `0` to charge none, and decimals such as `7.5` are allowed |
+| `PRICES_INCLUDE_TAX` | `true` | `true` means prices contain tax, and `false` adds it on top |
+| `SHIPPING_FEE_CENTS` | `10000` | Flat shipping fee |
+
+Tax applies to items and shipping. Orders show `vatableCents`, `taxCents`, and `totalCents`, and keep the rate and fee they were placed with. This is an order summary, not an official invoice.
+
+To use a courier's rates, change `calculateShipping` in `order.service.ts`, which preview and checkout both use.
 
 ## Addresses
 
