@@ -1,5 +1,5 @@
 # Development image, also the base for the production build.
-FROM node:24-alpine AS dev
+FROM node:25-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -12,7 +12,7 @@ FROM dev AS build
 RUN npm run build
 
 # Production image. Keep this stage last so it stays the default build target.
-FROM node:24-alpine
+FROM node:25-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
