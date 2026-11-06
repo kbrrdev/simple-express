@@ -149,13 +149,25 @@ export const blogParameters = {
 export const blogSchemas = {
   Blog: {
     type: 'object',
-    required: ['id', 'title', 'content', 'author', 'published', 'createdAt', 'updatedAt'],
+    required: [
+      'id',
+      'title',
+      'content',
+      'author',
+      'published',
+      'coverAssetId',
+      'coverImageUrl',
+      'createdAt',
+      'updatedAt',
+    ],
     properties: {
       id: { type: 'string', format: 'uuid' },
       title: { type: 'string', maxLength: 255, example: 'Hello' },
       content: { type: 'string', example: 'First post' },
       author: { type: 'string', maxLength: 100, example: 'Jane' },
       published: { type: 'boolean' },
+      coverAssetId: { type: ['string', 'null'], format: 'uuid' },
+      coverImageUrl: { type: ['string', 'null'], format: 'uri' },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
     },
@@ -169,6 +181,7 @@ export const blogSchemas = {
       content: { type: 'string', minLength: 1, example: 'First post' },
       author: { type: 'string', minLength: 1, maxLength: 100, example: 'Jane' },
       published: { type: 'boolean', default: false },
+      coverAssetId: { type: ['string', 'null'], format: 'uuid' },
     },
   },
   UpdateBlog: {
@@ -180,6 +193,7 @@ export const blogSchemas = {
       content: { type: 'string', minLength: 1 },
       author: { type: 'string', minLength: 1, maxLength: 100 },
       published: { type: 'boolean' },
+      coverAssetId: { type: ['string', 'null'], format: 'uuid' },
     },
   },
 };

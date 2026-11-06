@@ -151,6 +151,7 @@ If a simpler solution works just as well, choose the simpler solution.
 
 ## Git and Project Changes
 
+- Before starting new changes, ask whether to commit the current work.
 - Keep changes focused on the requested task.
 - Do not modify unrelated files.
 - Follow existing naming conventions.

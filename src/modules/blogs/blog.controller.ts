@@ -11,7 +11,7 @@ export async function list(req: Request, res: Response) {
 
   res.json({
     data: items,
-    meta: { page: query.page, limit: query.limit, total }
+    meta: { page: query.page, limit: query.limit, total },
   });
 }
 

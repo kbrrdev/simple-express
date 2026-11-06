@@ -3,6 +3,7 @@ import {
   addressPaths,
   addressSchemas,
 } from '../modules/addresses/address.openapi';
+import { assetPaths, assetSchemas } from '../modules/assets/asset.openapi';
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi';
 import { blogParameters, blogPaths, blogSchemas } from '../modules/blogs/blog.openapi';
 import { cartParameters, cartPaths, cartSchemas } from '../modules/cart/cart.openapi';
@@ -37,6 +38,7 @@ export const openApiDocument = {
     { name: 'Products' },
     { name: 'Cart' },
     { name: 'Addresses' },
+    { name: 'Assets' },
   ],
   paths: {
     '/health': {
@@ -66,6 +68,7 @@ export const openApiDocument = {
     ...productPaths,
     ...cartPaths,
     ...addressPaths,
+    ...assetPaths,
   },
   components: {
     securitySchemes: {
@@ -87,6 +90,7 @@ export const openApiDocument = {
         description: 'The request conflicts with existing data',
         content: errorContent,
       },
+      PayloadTooLarge: { description: 'The file is too large', content: errorContent },
       TooManyRequests: { description: 'Too many requests', content: errorContent },
       ServerError: { description: 'Unexpected server error', content: errorContent },
     },
@@ -97,6 +101,7 @@ export const openApiDocument = {
       ...productSchemas,
       ...cartSchemas,
       ...addressSchemas,
+      ...assetSchemas,
       PageMeta: {
         type: 'object',
         required: ['page', 'limit', 'total'],

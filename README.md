@@ -38,7 +38,9 @@ Set `JWT_SECRET` to a random value of at least 32 characters. The API will not s
 node -p "require('crypto').randomBytes(32).toString('hex')"
 ```
 
-Update the other environment variables as needed.
+Set `APP_DB_PASSWORD` to a random value too, using only URL-safe characters. The API connects as this limited role, which can read and write rows but not change the schema. When running on your host, also put it in `DATABASE_URL`.
+
+Update the other environment variables as needed. If the API runs behind a proxy, set `TRUST_PROXY_HOPS` to the number of proxies.
 
 ### Run Everything in Docker
 
@@ -92,6 +94,7 @@ To use another port, update `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
 | `npm run db:migrate` | Apply pending migrations |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:make-admin -- <email>` | Make an existing user an admin |
+| `npm run postman` | Regenerate the Postman collection |
 | `npm run docker:watch` | Run Docker development environment with live reload |
 | `npm run docker:down` | Stop Docker development containers |
 | `npm run test:db` | Start the disposable test database |
@@ -106,6 +109,14 @@ With the API running, open the interactive documentation at:
 `http://localhost:3000/api-docs`
 
 The raw OpenAPI document is available at `http://localhost:3000/api-docs.json`.
+
+Swagger is not served when `NODE_ENV` is `production`.
+
+### Postman
+
+Import [docs/postman-collection.json](docs/postman-collection.json) into Postman. Run **Log in and start a session** first. Tokens and created IDs are saved to collection variables, and later requests use them. To target another server, change the `baseUrl` variable.
+
+The collection is generated from the OpenAPI document, so run `npm run postman` after changing any `<name>.openapi.ts` file. A test fails if it is out of date.
 
 Each module documents its endpoints in its own `<name>.openapi.ts` file, and `src/docs/openapi.ts` combines them with the shared definitions. These files are maintained by hand, so update them whenever an endpoint changes.
 
@@ -123,6 +134,7 @@ src/
 ├── routes/
 └── modules/
     ├── addresses/
+    ├── assets/
     ├── auth/
     ├── blogs/
     ├── cart/
@@ -382,6 +394,53 @@ Logged-in users can save up to 20 delivery addresses in the Philippines. Request
 - `postalCode` must be 4 digits.
 
 A user's first address becomes the default. Deleting the default makes the newest remaining address the default.
+
+## Assets
+
+All uploaded files are stored in one `assets` table, and products and blogs point to it. Only admins can upload, and anyone can view uploaded files.
+
+Attaching an image takes two steps:
+
+```text
+1. POST /api/assets with the image in the "file" form field. Returns { id, url }.
+2. Attach it using the id, as shown below.
+```
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/assets` | List uploaded files |
+| `POST /api/assets` | Upload a JPEG, PNG, or WebP image of up to 5 MB |
+| `DELETE /api/assets/:id` | Delete a file that nothing uses |
+| `POST /api/products/:id/images` | Add an asset to a product, up to 10 |
+| `PATCH /api/products/:id/images/:imageId` | Change an image's alt text or position |
+| `DELETE /api/products/:id/images/:imageId` | Remove an image from a product, keeping the file |
+| `PATCH /api/products/:id/variants/:variantId` | Set `assetId` to give a variant one of the product's images |
+| `POST /api/blogs` or `PATCH /api/blogs/:id` | Set `coverAssetId` to give a blog a cover |
+
+File types are checked from the file's contents, and uploaded filenames are never used. A file cannot be deleted while a product, variant, or blog uses it.
+
+### File Storage
+
+Files are saved to disk by default, in the `uploads-data` Docker volume. The volume survives rebuilds, but it is not backed up, and it only works with a single API server. Set `PUBLIC_BASE_URL` to the public address of the API, as it is used to build file URLs.
+
+To use S3 instead, set these in `.env`:
+
+```bash
+S3_BUCKET=my-store-assets
+S3_REGION=ap-southeast-1
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+```
+
+S3 is used whenever `S3_BUCKET` is set, and the API will not start if any of the others are missing. The bucket must allow public reads, as file URLs point directly to it.
+
+For an S3-compatible service, also set `S3_ENDPOINT` and `S3_PUBLIC_URL`. On AWS, `S3_PUBLIC_URL` is optional, and can point to a CDN.
+
+Only the file path is stored, so changing the storage does not touch the database. Copy existing files to the new location first, or their URLs will stop working. Back up the volume or bucket along with the database.
+
+## Security
+
+Known gaps and decisions are recorded in [docs/security.md](docs/security.md). Tools for checking the project are described in [docs/security-tools.md](docs/security-tools.md).
 
 ## Testing
 

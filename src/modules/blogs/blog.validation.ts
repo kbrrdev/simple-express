@@ -11,6 +11,7 @@ export interface CreateBlogBody {
   content: string;
   author: string;
   published?: boolean;
+  coverAssetId?: string | null;
 }
 
 export type UpdateBlogBody = Partial<CreateBlogBody>;
@@ -29,12 +30,14 @@ const title = Joi.string().trim().min(1).max(255);
 const content = Joi.string().trim().min(1);
 const author = Joi.string().trim().min(1).max(100);
 const published = Joi.boolean();
+const coverAssetId = Joi.string().uuid().allow(null);
 
 export const createBlogBody = Joi.object<CreateBlogBody>({
   title: title.required(),
   content: content.required(),
   author: author.required(),
   published,
+  coverAssetId,
 });
 
 export const updateBlogBody = Joi.object<UpdateBlogBody>({
@@ -42,4 +45,5 @@ export const updateBlogBody = Joi.object<UpdateBlogBody>({
   content,
   author,
   published,
+  coverAssetId,
 }).min(1);
