@@ -12,6 +12,7 @@ import {
   categoryPaths,
   categorySchemas,
 } from '../modules/categories/category.openapi';
+import { orderParameters, orderPaths, orderSchemas } from '../modules/orders/order.openapi';
 import {
   productParameters,
   productPaths,
@@ -37,6 +38,7 @@ export const openApiDocument = {
     { name: 'Categories' },
     { name: 'Products' },
     { name: 'Cart' },
+    { name: 'Orders' },
     { name: 'Addresses' },
     { name: 'Assets' },
   ],
@@ -67,6 +69,7 @@ export const openApiDocument = {
     ...categoryPaths,
     ...productPaths,
     ...cartPaths,
+    ...orderPaths,
     ...addressPaths,
     ...assetPaths,
   },
@@ -79,6 +82,7 @@ export const openApiDocument = {
       ...categoryParameters,
       ...productParameters,
       ...cartParameters,
+      ...orderParameters,
       ...addressParameters,
     },
     responses: {
@@ -100,6 +104,7 @@ export const openApiDocument = {
       ...categorySchemas,
       ...productSchemas,
       ...cartSchemas,
+      ...orderSchemas,
       ...addressSchemas,
       ...assetSchemas,
       PageMeta: {
@@ -122,7 +127,7 @@ export const openApiDocument = {
               message: { type: 'string' },
               details: {
                 type: 'array',
-                description: 'Only present on validation errors',
+                description: 'Present on validation errors and failed checkouts',
                 items: {
                   type: 'object',
                   required: ['field', 'message'],

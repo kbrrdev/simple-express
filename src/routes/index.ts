@@ -11,6 +11,7 @@ import { authRoutes } from '../modules/auth/auth.routes';
 import { blogRoutes } from '../modules/blogs/blog.routes';
 import { cartRoutes } from '../modules/cart/cart.routes';
 import { categoryRoutes } from '../modules/categories/category.routes';
+import { orderRoutes } from '../modules/orders/order.routes';
 import { productRoutes } from '../modules/products/product.routes';
 
 const apiRoutes = Router();
@@ -22,6 +23,7 @@ apiRoutes.use('/auth', authRoutes);
 apiRoutes.use('/blogs', blogRoutes);
 apiRoutes.use('/cart', cartRoutes);
 apiRoutes.use('/categories', categoryRoutes);
+apiRoutes.use('/orders', orderRoutes);
 apiRoutes.use('/products', productRoutes);
 
 export const routes = Router();

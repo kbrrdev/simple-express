@@ -71,6 +71,20 @@
       "when": 1793937352731,
       "tag": "0009_harden_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793940403828,
+      "tag": "0010_create_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793941516972,
+      "tag": "0011_add_payments_and_guests",
+      "breakpoints": true
     }
   ]
 }

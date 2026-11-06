@@ -101,6 +101,22 @@ Only the most recent old refresh token used to be remembered. Each token now hol
 
 **Plan:** always return the same response, and send an email to explain. Until email exists, this is an accepted risk.
 
+## Waiting on Email
+
+These need an email service. Use Mailpit in development and a real provider in production.
+
+- Password reset (gap 5)
+- Email verification (gap 10)
+- Hiding whether an email is registered (gap 11)
+- Sending guests their private order link
+- Claiming past guest orders after verifying an email
+- Order confirmation and status update emails
+- Manual payment instructions and payment confirmed emails
+- Security notices, such as password changed or session revoked
+
 ## Decisions
+
+- **Guest orders:** guests cannot use COD, as anonymous orders invite fake ones. Guest checkout has its own rate limit per IP address.
+- **Guest order links:** the link is the only access to a guest order, so it is sent with `Cache-Control: no-store`. Changing `JWT_SECRET` invalidates all of them.
 
 - **Row Level Security:** not used. The API is the only client of the database, and queries are scoped to the user in the service layer. Reconsider it if anything else connects directly.

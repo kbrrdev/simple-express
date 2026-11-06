@@ -38,9 +38,12 @@ const document = openApiDocument as unknown as {
 
 /** Lets a saved id flow into the following requests. */
 const bodyVariables: Record<string, string> = {
+  addressId: '{{addressId}}',
   assetId: '{{assetId}}',
   categoryId: '{{categoryId}}',
   coverAssetId: '{{assetId}}',
+  expectedTotalCents: '{{expectedTotalCents}}',
+  idempotencyKey: '{{$guid}}',
   refreshToken: '{{refreshToken}}',
   variantId: '{{variantId}}',
 };
@@ -50,6 +53,7 @@ const idVariablesByTag: Record<string, string> = {
   Assets: 'assetId',
   Blogs: 'blogId',
   Categories: 'categoryId',
+  Orders: 'orderId',
   Products: 'productId',
 };
 
@@ -58,6 +62,7 @@ const createdIdVariables: Record<string, string> = {
   '/api/assets': 'assetId',
   '/api/blogs': 'blogId',
   '/api/categories': 'categoryId',
+  '/api/orders': 'orderId',
   '/api/products': 'productId',
   '/api/products/{id}/images': 'imageId',
   '/api/products/{id}/variants': 'variantId',
@@ -123,6 +128,7 @@ function requestBody({ requestBody }: Operation) {
 }
 
 function pathVariableValue(name: string, tag: string) {
+  if (name === 'token') return '{{guestToken}}';
   return `{{${name === 'id' ? idVariablesByTag[tag] : name}}}`;
 }
 
@@ -155,6 +161,22 @@ function testScript(path: string) {
       '  const { accessToken, refreshToken } = pm.response.json().data;',
       "  pm.collectionVariables.set('accessToken', accessToken);",
       "  if (refreshToken) pm.collectionVariables.set('refreshToken', refreshToken);",
+      '}',
+    ];
+  }
+
+  if (path === '/api/orders/guest') {
+    return [
+      'if (pm.response.code === 201) {',
+      "  pm.collectionVariables.set('guestToken', pm.response.json().data.guestToken);",
+      '}',
+    ];
+  }
+
+  if (path === '/api/orders/preview') {
+    return [
+      'if (pm.response.code === 200) {',
+      "  pm.collectionVariables.set('expectedTotalCents', pm.response.json().data.totalCents);",
       '}',
     ];
   }
@@ -217,7 +239,10 @@ export function buildPostmanCollection() {
         'assetId',
         'blogId',
         'categoryId',
+        'expectedTotalCents',
+        'guestToken',
         'imageId',
+        'orderId',
         'productId',
         'variantId',
       ].map((key) => ({ key, value: '' })),

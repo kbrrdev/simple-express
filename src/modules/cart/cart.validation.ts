@@ -31,11 +31,12 @@ export const updateCartItemBody = Joi.object<UpdateCartItemBody>({
   quantity: quantity.required(),
 });
 
-/** A guest cart sent from the client, for /preview and /merge. */
+/** A guest cart sent from the client. */
+export const cartItemsList = Joi.array()
+  .items(Joi.object({ variantId: variantId.required(), quantity: quantity.required() }))
+  .max(100)
+  .unique('variantId');
+
 export const cartItemsBody = Joi.object<CartItemsBody>({
-  items: Joi.array()
-    .items(Joi.object({ variantId: variantId.required(), quantity: quantity.required() }))
-    .max(100)
-    .unique('variantId')
-    .required(),
+  items: cartItemsList.required(),
 });
