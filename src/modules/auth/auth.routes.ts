@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
+import { logRateLimit } from '../../middleware/rate-limit';
 import { requireAuth } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './auth.controller';
@@ -14,6 +15,7 @@ export const credentialsLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: tooManyRequests,
+  handler: logRateLimit,
 });
 
 export const refreshLimiter = rateLimit({
@@ -22,6 +24,7 @@ export const refreshLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: tooManyRequests,
+  handler: logRateLimit,
 });
 
 export const authRoutes = Router();

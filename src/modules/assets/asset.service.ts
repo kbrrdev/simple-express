@@ -3,6 +3,8 @@ import { count, desc, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { FOREIGN_KEY_VIOLATION, hasDbErrorCode } from '../../lib/db-errors';
+import { logger } from '../../lib/logger';
+import { recordStep } from '../../lib/request-context';
 import { deleteFile, fileUrl, saveFile } from '../../lib/storage';
 import { assets, type Asset } from './asset.schema';
 import type { ListAssetsQuery } from './asset.validation';
@@ -52,7 +54,9 @@ export async function createAsset(file: Buffer) {
 
   const path = `${randomUUID()}.${type.extension}`;
 
+  recordStep('File checked');
   await saveFile(path, file, type.mimeType);
+  recordStep('File saved');
 
   try {
     const [asset] = await db
@@ -60,6 +64,8 @@ export async function createAsset(file: Buffer) {
       .values({ path, mimeType: type.mimeType, sizeBytes: file.length })
       .returning();
     if (!asset) throw new AppError(500, 'Failed to create asset');
+
+    logger.info({ assetId: asset.id, sizeBytes: asset.sizeBytes }, 'File uploaded');
 
     return toPublicAsset(asset);
   } catch (error) {
@@ -78,7 +84,9 @@ export async function deleteAsset(id: string): Promise<void> {
 
     if (!asset) throw new AppError(404, `Asset not found: ${id}`);
 
+    recordStep('Asset row deleted');
     await deleteFile(asset.path);
+    logger.info({ assetId: id }, 'File deleted');
   } catch (error) {
     if (hasDbErrorCode(error, FOREIGN_KEY_VIOLATION)) {
       throw new AppError(409, 'Asset is still in use');

@@ -134,6 +134,10 @@ export const openApiDocument = {
             required: ['message'],
             properties: {
               message: { type: 'string' },
+              requestId: {
+                type: 'string',
+                description: 'Only present on 500 errors. Quote this to support.',
+              },
               details: {
                 type: 'array',
                 description: 'Present on validation errors and failed checkouts',

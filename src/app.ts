@@ -4,12 +4,15 @@ import express from 'express';
 import helmet from 'helmet';
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { requestLogger } from './middleware/request-logger';
 import { routes } from './routes';
 
 export const app = express();
 
 app.disable('x-powered-by');
 app.set('trust proxy', env.TRUST_PROXY_HOPS);
+
+app.use(requestLogger);
 
 app.use(
   helmet({
@@ -21,7 +24,13 @@ app.use(
 );
 
 // Runs before body parsing so that error responses also carry CORS headers.
-app.use(cors({ origin: env.CORS_ORIGINS, credentials: true, exposedHeaders: ['Location'] }));
+app.use(
+  cors({
+    origin: env.CORS_ORIGINS,
+    credentials: true,
+    exposedHeaders: ['Location', 'X-Request-Id'],
+  }),
+);
 app.use(express.json());
 app.use(cookieParser());
 

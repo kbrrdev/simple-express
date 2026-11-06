@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, exists, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
+import { logger } from '../../lib/logger';
 import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
 import {
@@ -140,6 +141,8 @@ export async function deactivateProduct(id: string): Promise<void> {
     .returning({ id: products.id });
 
   if (!product) notFound(id);
+
+  logger.info({ productId: id }, 'Product deactivated');
 }
 
 export async function addVariant(productId: string, data: VariantBody): Promise<ProductVariant> {
@@ -179,7 +182,15 @@ export async function updateVariant(
       .set(data)
       .where(eq(productVariants.id, variantId))
       .returning();
-    return variant ?? variantNotFound(variantId);
+    if (!variant) variantNotFound(variantId);
+
+    const { priceCents, stock, active } = data;
+    logger.info(
+      { productId, variantId, changes: { priceCents, stock, active } },
+      'Variant changed',
+    );
+
+    return variant;
   } catch (error) {
     if (hasDbErrorCode(error, FOREIGN_KEY_VIOLATION)) {
       throw new AppError(400, "Asset must be one of the product's images");
@@ -196,6 +207,8 @@ export async function deactivateVariant(productId: string, variantId: string): P
     .returning({ id: productVariants.id });
 
   if (!variant) variantNotFound(variantId);
+
+  logger.info({ productId, variantId }, 'Variant deactivated');
 }
 
 export async function findImages(productIds: string[]) {

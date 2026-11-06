@@ -17,6 +17,8 @@ import { env } from '../../config/env';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
+import { logger } from '../../lib/logger';
+import { recordStep } from '../../lib/request-context';
 import { fileUrl } from '../../lib/storage';
 import { addresses } from '../addresses/address.schema';
 import { assets } from '../assets/asset.schema';
@@ -69,7 +71,11 @@ function readGuestToken(token: string) {
   const expected = Buffer.from(signGuestOrder(id));
   const actual = Buffer.from(signature);
 
-  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return undefined;
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+    logger.warn('Guest link refused');
+    return undefined;
+  }
+
   return id;
 }
 
@@ -135,6 +141,10 @@ function findItems(database: Database, orderIds: string[]) {
 }
 
 type ItemRow = Awaited<ReturnType<typeof findItems>>[number];
+type PlacedOrder = Pick<
+  ReturnType<typeof toPublicOrder>,
+  'id' | 'orderNumber' | 'paymentType' | 'paymentProvider' | 'totalCents' | 'items'
+>;
 type OrderDetails = { items: ItemRow[]; qrPaths: Map<string, string> };
 
 /** Loads what orders show beyond their own row: their items and the QR to pay with. */
@@ -209,10 +219,35 @@ export async function previewOrder(items: CartItemInput[]) {
   };
 }
 
+function logOrderPlaced({ order, created }: { order: PlacedOrder; created: boolean }) {
+  if (!created) return;
+
+  logger.info(
+    {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      paymentType: order.paymentType,
+      paymentProvider: order.paymentProvider,
+      totalCents: order.totalCents,
+      items: order.items.map(({ variantId, quantity }) => ({ variantId, quantity })),
+    },
+    'Order placed',
+  );
+}
+
 export async function createOrder(userId: string, body: CreateOrderBody) {
+  const result = await placeCustomerOrder(userId, body);
+
+  logOrderPlaced(result);
+
+  return result;
+}
+
+function placeCustomerOrder(userId: string, body: CreateOrderBody) {
   return db.transaction(async (tx) => {
     // One checkout per user at a time, so a double submit cannot buy the same cart twice.
     await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('no key update');
+    recordStep('Checkout started');
 
     const [existing] = await tx
       .select()
@@ -232,14 +267,17 @@ export async function createOrder(userId: string, body: CreateOrderBody) {
       .where(and(eq(addresses.id, body.addressId), eq(addresses.userId, userId)));
 
     if (!address) throw new AppError(404, `Address not found: ${body.addressId}`);
+    recordStep('Address loaded');
 
     const items = await findCheckoutItems(tx, userId);
 
     if (items.length === 0) throw new AppError(409, 'Cart is empty');
+    recordStep('Cart loaded');
 
     const order = await placeOrder(tx, { ...body, owner: { userId }, address, items });
 
     await tx.delete(cartItems).where(eq(cartItems.userId, userId));
+    recordStep('Cart emptied');
 
     return { order: toPublicOrder(order, await findDetails(tx, [order])), created: true };
   });
@@ -247,15 +285,25 @@ export async function createOrder(userId: string, body: CreateOrderBody) {
 
 /** Guests have no cart or saved address, so the request carries both. */
 export async function createGuestOrder(body: GuestOrderBody) {
+  const result = await placeGuestOrder(body);
+
+  logOrderPlaced(result);
+
+  return result;
+}
+
+function placeGuestOrder(body: GuestOrderBody) {
   return db.transaction(async (tx) => {
     // One checkout per email at a time, as guests have no user row to lock.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${body.email}))`);
+    recordStep('Checkout started');
 
     const [existing] = await tx.select().from(orders).where(guestOrderKey(body));
 
     if (existing) return { order: await toGuestOrder(tx, existing), created: false };
 
     const items = await findGuestItems(tx, body.items);
+    recordStep('Items loaded');
     const order = await placeOrder(tx, { ...body, owner: { guestEmail: body.email }, items });
 
     return { order: await toGuestOrder(tx, order), created: true };
@@ -265,14 +313,17 @@ export async function createGuestOrder(body: GuestOrderBody) {
 async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   const { owner, address, items, paymentMethod, expectedTotalCents, idempotencyKey } = input;
   const method = await findPaymentMethod(tx, paymentMethod);
+  recordStep('Payment method checked');
 
   await assertOrderLimit(tx, owner);
+  recordStep('Order limit checked');
 
   const unavailable = items.filter((item) => !item.variantActive || !item.productActive);
 
   if (unavailable.length > 0) {
     throw checkoutError('Some items are no longer available', unavailable, 'is unavailable');
   }
+  recordStep('Items checked');
 
   const shippingCents = await calculateShipping(items, address);
   const pricing = priceOrder(items, shippingCents);
@@ -280,8 +331,10 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   if (pricing.totalCents !== expectedTotalCents) {
     throw new AppError(409, 'The order total has changed');
   }
+  recordStep('Total checked');
 
   await reduceStock(tx, items);
+  recordStep('Stock reduced');
 
   const [order] = await tx
     .insert(orders)
@@ -334,6 +387,8 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       lineTotalCents: line.lineTotalCents,
     })),
   );
+
+  recordStep('Order saved');
 
   return order;
 }
@@ -417,11 +472,15 @@ async function submitPayment(tx: Transaction, order: Order, reference: string) {
     throw error;
   }
 
+  recordStep('Payment saved');
+
   const [updated] = await tx
     .update(orders)
     .set({ paymentStatus: 'submitted' })
     .where(eq(orders.id, order.id))
     .returning();
+
+  logger.info({ orderId: order.id }, 'Payment reference submitted');
 
   return updated ?? notFound(order.id);
 }
@@ -433,6 +492,7 @@ export async function confirmPayment(id: string) {
     }
 
     await markPaid(tx, id);
+    logger.info({ orderId: id, totalCents: order.totalCents }, 'Payment confirmed');
   });
 
   return getAnyOrder(id);
@@ -445,6 +505,7 @@ export async function rejectPayment(id: string) {
     }
 
     await cancelOrder(tx, order);
+    logger.info({ orderId: id, totalCents: order.totalCents }, 'Payment rejected');
   });
 
   return getAnyOrder(id);
@@ -462,6 +523,7 @@ export async function refundPayment(id: string) {
     }
 
     await tx.update(orders).set({ paymentStatus: 'refunded' }).where(eq(orders.id, id));
+    logger.info({ orderId: id, totalCents: order.totalCents }, 'Refund recorded');
   });
 
   return getAnyOrder(id);
@@ -486,7 +548,10 @@ export async function expireUnpaidOrders() {
 
     for (const order of expired) {
       await cancelOrder(tx, order);
+      logger.info({ orderId: order.id }, 'Unpaid order expired');
     }
+
+    if (expired.length > 0) logger.info({ count: expired.length }, 'Expiry run finished');
 
     return expired.length;
   });
@@ -589,6 +654,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
 
     // Returned stock is left alone, as the item may be damaged. Admins add it back by hand.
     await tx.update(orders).set({ status }).where(eq(orders.id, id));
+    logger.info({ orderId: id, from: order.status, to: status }, 'Order status changed');
 
     // Delivering a COD order means the customer has handed the cash to the courier.
     if (status === 'delivered' && order.paymentType === 'cod') {
@@ -604,14 +670,17 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
  * Repeating it changes nothing, as providers can deliver the same event twice.
  */
 export async function markPaid(tx: Transaction, orderId: string) {
-  await tx
+  const paid = await tx
     .update(orders)
     .set({
       paymentStatus: 'paid',
       paymentDueAt: null,
       status: sql`case when ${orders.status} = 'awaiting_payment' then 'pending'::order_status else ${orders.status} end`,
     })
-    .where(and(eq(orders.id, orderId), ne(orders.paymentStatus, 'paid')));
+    .where(and(eq(orders.id, orderId), ne(orders.paymentStatus, 'paid')))
+    .returning({ totalCents: orders.totalCents });
+
+  if (paid[0]) logger.info({ orderId, totalCents: paid[0].totalCents }, 'Order paid');
 }
 
 /** Locks one order row, so that its status, payment, and stock change only once. */
@@ -651,6 +720,9 @@ async function cancelOrder(tx: Transaction, order: Order) {
     })
     .where(eq(orders.id, order.id))
     .returning();
+
+  logger.info({ orderId: order.id, from: order.status }, 'Order cancelled');
+  logger.info({ orderId: order.id, items }, 'Stock returned');
 
   return cancelled ?? notFound(order.id);
 }

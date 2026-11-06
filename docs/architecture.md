@@ -15,7 +15,7 @@ Client
 Express Application
   |
   v
-Global Middleware (security headers, CORS, JSON and cookie parsing)
+Global Middleware (request logging, security headers, CORS, JSON and cookie parsing)
   |
   v
 Routes
@@ -68,11 +68,11 @@ Shared OpenAPI definitions, combined with each module's documentation and served
 
 ### lib/
 
-Shared utilities, including the `AppError` class.
+Shared utilities, including the `AppError` class, the logger, and file storage.
 
 ### middleware/
 
-Shared Express middleware for authentication, request validation, and error handling.
+Shared Express middleware for request logging, authentication, request validation, rate limits, and error handling.
 
 ### modules/
 
@@ -195,6 +195,15 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - A product has up to 10 rows in `product_images`, which hold the alt text and position. A variant's `asset_id` has a composite foreign key to `product_images`, which keeps the image on the same product and blocks removing it while in use.
 - Cart and order items use the variant's image, then the product's first image. Order items also block deleting the asset.
 
+## Logging
+
+- `src/lib/logger.ts` writes JSON to standard output with Pino, and Docker rotates it. Redaction is a safety net, and sensitive values should not reach the logger.
+- `src/lib/request-context.ts` uses `AsyncLocalStorage` to carry a `requestId`, the `userId`, and recent steps through a request, so nothing has to pass them around. Timers call `runWithContext` to get their own ID.
+- `requestLogger` runs first, creates the context, and logs each request. It drops query strings and masks guest links.
+- `recordStep` notes progress. Steps stay out of normal logs, and the error handler adds them to errors as `steps` and `lastStep`.
+- A client disconnecting fires the `close` event outside the request, so that listener is bound with `AsyncLocalStorage.bind`.
+- Expected errors are logged as `warn`, without their details, and unexpected ones as `error`.
+
 ## Validation
 
 The `validate` middleware checks request bodies, parameters, and query strings against Joi schemas. Unknown fields are rejected.
@@ -208,7 +217,7 @@ The `validate` middleware checks request bodies, parameters, and query strings a
 // List
 { "data": [], "meta": { "page": 1, "limit": 20, "total": 0 } }
 
-// Error (details are only present on validation errors and failed checkouts)
+// Error (details are only present on validation errors and failed checkouts, and requestId on 500 errors)
 { "error": { "message": "Validation failed", "details": [] } }
 ```
 

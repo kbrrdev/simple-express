@@ -5,6 +5,7 @@ dotenv.config({ quiet: true });
 
 interface Env {
   NODE_ENV: 'development' | 'test' | 'production';
+  LOG_LEVEL: string;
   PORT: number;
   DATABASE_URL: string;
   MIGRATION_DATABASE_URL?: string;
@@ -47,6 +48,10 @@ const s3Setting = Joi.string()
 
 const envSchema = Joi.object<Env>({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  LOG_LEVEL: Joi.string()
+    .valid('debug', 'info', 'warn', 'error', 'silent')
+    .empty('')
+    .default('info'),
   PORT: Joi.number().port().default(3000),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgres', 'postgresql'] })

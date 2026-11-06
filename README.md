@@ -561,6 +561,39 @@ For an S3-compatible service, also set `S3_ENDPOINT` and `S3_PUBLIC_URL`. On AWS
 
 Only the file path is stored, so changing the storage does not touch the database. Copy existing files to the new location first, or their URLs will stop working. Back up the volume or bucket along with the database.
 
+## Logging
+
+The app logs JSON to standard output with [Pino](https://getpino.io), and Docker collects and rotates it. In development, logs are formatted to be readable. Set the level with `LOG_LEVEL`.
+
+Every line from one API request carries the same `requestId`, and a `userId` once the user is logged in. The ID is also returned in the `X-Request-Id` header, and in the body of `500` errors, so a customer can quote it.
+
+To follow a request or a customer in Docker:
+
+```bash
+docker compose logs api | grep <requestId>
+docker compose logs api | grep <userId>
+```
+
+Logs cover every request, all errors, all payment activity, and processes such as checkout, stock, status changes, and the expiry timer.
+
+Errors also show `lastStep` and `steps`, the work a request finished before failing:
+
+```json
+{
+  "level": 40,
+  "requestId": "7f3c9a1e-...",
+  "userId": "a81b...",
+  "status": 409,
+  "lastStep": "Items checked",
+  "steps": ["Authenticated", "Validated body", "Checkout started", "Address loaded", "Cart loaded", "Payment method checked", "Order limit checked", "Items checked"],
+  "msg": "The order total has changed"
+}
+```
+
+To log from anywhere, use `logger` from `src/lib/logger.ts`, and `recordStep` from `src/lib/request-context.ts` to note progress. The IDs are added automatically.
+
+Never log passwords, tokens, emails, phone numbers, addresses, account numbers, or payment references. Use IDs instead.
+
 ## Security
 
 Known gaps and decisions are recorded in [docs/security.md](docs/security.md). Tools for checking the project are described in [docs/security-tools.md](docs/security-tools.md).

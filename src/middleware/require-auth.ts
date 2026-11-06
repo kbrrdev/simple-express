@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 import { AppError } from '../lib/app-error';
+import { recordStep, setUserId } from '../lib/request-context';
 import { verifyAccessToken } from '../modules/auth/auth.service';
 
 export const requireAuth: RequestHandler = async (req, res, next) => {
@@ -9,7 +10,11 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     throw new AppError(401, 'Missing access token');
   }
 
-  res.locals.auth = await verifyAccessToken(token);
+  const auth = await verifyAccessToken(token);
+
+  res.locals.auth = auth;
+  setUserId(auth.userId);
+  recordStep('Authenticated');
   next();
 };
 
@@ -19,5 +24,6 @@ export const requireAdmin: RequestHandler = (_req, res, next) => {
     throw new AppError(403, 'Admin access required');
   }
 
+  recordStep('Admin check passed');
   next();
 };

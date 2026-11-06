@@ -8,6 +8,7 @@ import { users } from '../src/db/schema';
 import { openApiDocument } from '../src/docs/openapi';
 import { buildPostmanCollection } from '../src/docs/postman';
 import { toSafeLog } from '../src/lib/db-errors';
+import { logger } from '../src/lib/logger';
 import { errorHandler } from '../src/middleware/error-handler';
 
 const login = (ip: string) =>
@@ -77,7 +78,7 @@ describe('error logs', () => {
 
   it('keep query values out of unexpected errors', async () => {
     const error = await failedInsert();
-    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
     const json = vi.fn();
     const res = { status: vi.fn(() => ({ json })) } as unknown as Response;
 
@@ -89,7 +90,9 @@ describe('error logs', () => {
     expect(logged).toContain('insert into');
     expect(logged).not.toContain('SECRET-HASH-VALUE');
     expect(logged).not.toContain('secret-person@example.com');
-    expect(json).toHaveBeenCalledWith({ error: { message: 'Internal server error' } });
+    expect(json).toHaveBeenCalledWith({
+      error: { message: 'Internal server error', requestId: undefined },
+    });
   });
 
   it('keep the kind of failure, for debugging', async () => {
