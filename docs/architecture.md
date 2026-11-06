@@ -197,7 +197,7 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 
 ## Logging
 
-- `src/lib/logger.ts` writes JSON to standard output with Pino, and Docker rotates it. Redaction is a safety net, and sensitive values should not reach the logger.
+- `src/lib/logger.ts` writes JSON to standard output with Pino, and Docker rotates it. Each line names its environment. Redaction is a safety net, and sensitive values should not reach the logger.
 - `src/lib/request-context.ts` uses `AsyncLocalStorage` to carry a `requestId`, the `userId`, and recent steps through a request, so nothing has to pass them around. Timers call `runWithContext` to get their own ID.
 - `requestLogger` runs first, creates the context, and logs each request. It drops query strings and masks guest links.
 - `recordStep` notes progress. Steps stay out of normal logs, and the error handler adds them to errors as `steps` and `lastStep`.
@@ -229,6 +229,8 @@ All application errors are handled through centralized error-handling middleware
 
 Application configuration is managed through environment variables, documented in `.env.example`.
 
+`NODE_ENV` controls runtime behaviour, and staging sets it to `production`. `APP_ENV` names the environment as `development`, `staging`, or `production`. It controls Swagger and is added to logs, and it follows `NODE_ENV` when unset. See [deployment.md](deployment.md).
+
 ## Testing
 
 API tests live in `tests/` and run with Vitest and Supertest against a disposable database, which `npm test` starts automatically.
@@ -237,5 +239,5 @@ API tests live in `tests/` and run with Vitest and Supertest against a disposabl
 
 - `docker-compose.yml` runs the production image and PostgreSQL, and keeps uploads in the `uploads-data` volume.
 - `docker-compose.dev.yml` adds the development image, live reload, and Adminer, used by `npm run docker:watch`.
-- PostgreSQL is published on `127.0.0.1:5433` by default, so only the host can reach it. `POSTGRES_PASSWORD` is required.
+- The API and PostgreSQL are published on `127.0.0.1` only, so that a proxy such as Caddy is the only way in. `POSTGRES_PASSWORD` is required.
 - The `db-test` service runs only with the `test` profile.

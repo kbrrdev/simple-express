@@ -27,6 +27,7 @@ The tools used to find problems are described in [security-tools.md](security-to
 | 17  | Guest links never expire               | Medium        | Fixed, with a note |
 | 18  | No automatic checks on GitHub          | Medium        | Fixed, with a note |
 | 19  | Large order totals failed              | Low           | Fixed              |
+| 20  | API published on all addresses         | Medium        | Fixed              |
 
 ## Fixed
 
@@ -125,6 +126,10 @@ Finished orders now hide the shipping address from their link, so an old link st
 
 Order amounts now use `bigint`, as a total above about 21 million pesos overflowed a 32-bit integer.
 
+### 20. API published on all addresses
+
+The API could be reached directly, skipping the proxy and HTTPS, as Docker can bypass firewall rules. It is now bound to `127.0.0.1`, so a proxy such as Caddy is the only way in. This also protects rate limits, which trust the proxy's forwarded IP address.
+
 ## Open
 
 ### 16. Admin login has no second factor
@@ -171,6 +176,7 @@ These need an email service. Use Mailpit in development and a real provider in p
 - **Guest orders:** guests cannot use COD, as anonymous orders invite fake ones. Guest checkout has its own rate limit per IP address.
 - **Guest order links:** the link is the only access to a guest order, so it is sent with `Cache-Control: no-store`. Changing `JWT_SECRET` invalidates all of them.
 - **Manual payments:** always confirm a payment in the GCash or bank app itself, never from a reference or screenshot alone.
+- **Staging:** it serves Swagger, so it must stay private. Each environment has its own secrets and data, as described in [deployment.md](deployment.md).
 - **Traffic floods:** these are handled in front of the API, such as by a free Cloudflare plan, not in the API.
 
 - **Row Level Security:** not used. The API is the only client of the database, and queries are scoped to the user in the service layer. Reconsider it if anything else connects directly.

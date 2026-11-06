@@ -18,6 +18,7 @@ export default defineConfig({
     fileParallelism: false,
     env: {
       DATABASE_URL: testDatabaseUrl,
+      APP_ENV: 'development',
       LOG_LEVEL: 'silent',
       MIGRATION_DATABASE_URL: '',
       TRUST_PROXY_HOPS: '0',

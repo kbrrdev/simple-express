@@ -22,6 +22,7 @@ export function createLogger(destination?: DestinationStream) {
   return pino(
     {
       level: env.LOG_LEVEL,
+      base: { env: env.APP_ENV },
       mixin: logContext,
       redact: { paths: redactedPaths, censor: '[hidden]' },
       ...(prettyOutput && { transport: { target: 'pino-pretty' } }),

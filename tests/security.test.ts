@@ -145,8 +145,40 @@ describe('API documentation', () => {
     await request(app).get('/api-docs/').expect(200);
   });
 
+  it('is served in staging, which runs with NODE_ENV production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('APP_ENV', 'staging');
+    vi.resetModules();
+
+    const fresh = await import('../src/app.js');
+    const db = await import('../src/db/index.js');
+
+    await request(fresh.app).get('/api-docs.json').expect(200);
+    await db.pool.end();
+  });
+
+  it('is not served when APP_ENV is left out of a production server', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('APP_ENV', '');
+    vi.resetModules();
+
+    const fresh = await import('../src/app.js');
+    const db = await import('../src/db/index.js');
+
+    await request(fresh.app).get('/api-docs.json').expect(404);
+    await db.pool.end();
+  });
+
+  it('rejects an unknown environment at startup', async () => {
+    vi.stubEnv('APP_ENV', 'prod');
+    vi.resetModules();
+
+    await expect(import('../src/config/env.js')).rejects.toThrow('APP_ENV');
+  });
+
   it('is not served in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('APP_ENV', 'production');
     vi.resetModules();
 
     const fresh = await import('../src/app.js');

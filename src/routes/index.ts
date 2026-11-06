@@ -35,7 +35,7 @@ routes.get('/health', async (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-if (env.NODE_ENV !== 'production') {
+if (env.APP_ENV !== 'production') {
   routes.get('/api-docs.json', (_req, res) => {
     res.json(openApiDocument);
   });

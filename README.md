@@ -110,7 +110,7 @@ With the API running, open the interactive documentation at:
 
 The raw OpenAPI document is available at `http://localhost:3000/api-docs.json`.
 
-Swagger is not served when `NODE_ENV` is `production`.
+Swagger is not served when `APP_ENV` is `production`.
 
 ### Postman
 
@@ -563,7 +563,7 @@ Only the file path is stored, so changing the storage does not touch the databas
 
 ## Logging
 
-The app logs JSON to standard output with [Pino](https://getpino.io), and Docker collects and rotates it. In development, logs are formatted to be readable. Set the level with `LOG_LEVEL`.
+The app logs JSON to standard output with [Pino](https://getpino.io), and Docker collects and rotates it. In development, logs are formatted to be readable. Set the level with `LOG_LEVEL`. Each line names its environment in `env`.
 
 Every line from one API request carries the same `requestId`, and a `userId` once the user is logged in. The ID is also returned in the `X-Request-Id` header, and in the body of `500` errors, so a customer can quote it.
 
@@ -593,6 +593,10 @@ Errors also show `lastStep` and `steps`, the work a request finished before fail
 To log from anywhere, use `logger` from `src/lib/logger.ts`, and `recordStep` from `src/lib/request-context.ts` to note progress. The IDs are added automatically.
 
 Never log passwords, tokens, emails, phone numbers, addresses, account numbers, or payment references. Use IDs instead.
+
+## Deployment
+
+See [docs/deployment.md](docs/deployment.md) for running on an Ubuntu server, including the differences between development, staging, and production.
 
 ## Security
 

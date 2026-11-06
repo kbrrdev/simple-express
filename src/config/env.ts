@@ -5,6 +5,7 @@ dotenv.config({ quiet: true });
 
 interface Env {
   NODE_ENV: 'development' | 'test' | 'production';
+  APP_ENV: 'development' | 'staging' | 'production';
   LOG_LEVEL: string;
   PORT: number;
   DATABASE_URL: string;
@@ -48,6 +49,13 @@ const s3Setting = Joi.string()
 
 const envSchema = Joi.object<Env>({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  // Follows NODE_ENV when unset, so a production server cannot expose Swagger by accident.
+  APP_ENV: Joi.string()
+    .valid('development', 'staging', 'production')
+    .empty('')
+    .default((parent: { NODE_ENV: string }) =>
+      parent.NODE_ENV === 'production' ? 'production' : 'development',
+    ),
   LOG_LEVEL: Joi.string()
     .valid('debug', 'info', 'warn', 'error', 'silent')
     .empty('')
