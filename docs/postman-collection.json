@@ -60,6 +60,10 @@
       "value": ""
     },
     {
+      "key": "paymentMethodId",
+      "value": ""
+    },
+    {
       "key": "productId",
       "value": ""
     },
@@ -1335,6 +1339,159 @@
       ]
     },
     {
+      "name": "Payment Methods",
+      "item": [
+        {
+          "name": "List the payment methods customers can choose",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Returns enabled methods only. Account details are shown on the order after checkout. COD is always available to logged-in customers, and is not listed.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment-methods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payment-methods"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Add a payment method (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.collectionVariables.set('paymentMethodId', data.id);",
+                  "  if (data.variants) pm.collectionVariables.set('variantId', data.variants[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Upload a QR image through /api/assets first, then send its id as qrAssetId.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment-methods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payment-methods"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerName\": \"GCash\",\n  \"accountName\": \"Juan Dela Cruz\",\n  \"accountNumber\": \"09171234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List all payment methods with account details (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment-methods/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payment-methods",
+                "admin"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Update a payment method (admin)",
+          "request": {
+            "method": "PATCH",
+            "description": "Orders already placed keep the details they were given.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment-methods/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payment-methods",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{paymentMethodId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerName\": \"GCash\",\n  \"accountName\": \"Juan Dela Cruz\",\n  \"accountNumber\": \"09171234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a payment method (admin)",
+          "request": {
+            "method": "DELETE",
+            "description": "Fails with 409 once orders use it. Set enabled to false instead.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment-methods/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payment-methods",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{paymentMethodId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Orders",
       "item": [
         {
@@ -1482,7 +1639,7 @@
             "auth": {
               "type": "noauth"
             },
-            "description": "Guests pay by GCash or bank transfer only. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.",
+            "description": "Guests cannot use COD. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/orders/guest",
@@ -1499,7 +1656,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"guest@example.com\",\n  \"address\": {\n    \"recipientName\": \"Juan Dela Cruz\",\n    \"phone\": \"09171234567\",\n    \"line1\": \"123 Rizal Street\",\n    \"line2\": \"Sunrise Village\",\n    \"barangay\": \"San Antonio\",\n    \"city\": \"Pasig\",\n    \"province\": \"Metro Manila\",\n    \"postalCode\": \"1605\"\n  },\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"paymentMethod\": \"gcash\",\n  \"expectedTotalCents\": \"{{expectedTotalCents}}\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}",
+              "raw": "{\n  \"email\": \"guest@example.com\",\n  \"address\": {\n    \"recipientName\": \"Juan Dela Cruz\",\n    \"phone\": \"09171234567\",\n    \"line1\": \"123 Rizal Street\",\n    \"line2\": \"Sunrise Village\",\n    \"barangay\": \"San Antonio\",\n    \"city\": \"Pasig\",\n    \"province\": \"Metro Manila\",\n    \"postalCode\": \"1605\"\n  },\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"paymentMethod\": \"{{paymentMethodId}}\",\n  \"expectedTotalCents\": \"{{expectedTotalCents}}\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1796,7 +1953,7 @@
           "name": "Submit a payment reference",
           "request": {
             "method": "POST",
-            "description": "Used after paying by GCash or bank transfer. An admin then checks it.",
+            "description": "Used after paying a manual method. An admin then checks it.",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/orders/:id/payment",

@@ -24,6 +24,7 @@ import { users } from '../auth/auth.schema';
 import { cartItems } from '../cart/cart.schema';
 import { previewCart } from '../cart/cart.service';
 import type { CartItemInput } from '../cart/cart.validation';
+import { paymentMethods } from '../payment-methods/payment-method.schema';
 import { productImages, products, productVariants } from '../products/product.schema';
 import { orderItems, orders, payments, type Order, type OrderStatus } from './order.schema';
 import type { CreateOrderBody, GuestOrderBody, ListOrdersQuery } from './order.validation';
@@ -31,13 +32,12 @@ import type { CreateOrderBody, GuestOrderBody, ListOrdersQuery } from './order.v
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Database = typeof db | Transaction;
 type PricedItem = { unitPriceCents: number; quantity: number };
-type PaymentMethod = Order['paymentMethod'];
 
 interface PlaceOrderInput {
   owner: { userId: string } | { guestEmail: string };
   address: Omit<GuestOrderBody['address'], 'line2'> & { line2?: string };
   items: CheckoutItem[];
-  paymentMethod: PaymentMethod;
+  paymentMethod: string;
   expectedTotalCents: number;
   idempotencyKey: string;
 }
@@ -57,12 +57,6 @@ const adminOrderFields = {
   customerEmail: users.email,
   paymentReference: payments.reference,
 };
-
-function paymentDetails(method: PaymentMethod) {
-  if (method === 'gcash') return env.PAYMENT_GCASH_NUMBER;
-  if (method === 'bank_transfer') return env.PAYMENT_BANK_DETAILS;
-  return undefined;
-}
 
 function signGuestOrder(id: string) {
   return createHmac('sha256', env.JWT_SECRET).update(`guest-order:${id}`).digest('base64url');
@@ -139,19 +133,44 @@ function findItems(database: Database, orderIds: string[]) {
 }
 
 type ItemRow = Awaited<ReturnType<typeof findItems>>[number];
+type OrderDetails = { items: ItemRow[]; qrPaths: Map<string, string> };
 
-function toPublicOrder(order: Order, items: ItemRow[]) {
+/** Loads what orders show beyond their own row: their items and the QR to pay with. */
+async function findDetails(database: Database, rows: Order[]): Promise<OrderDetails> {
+  const items = await findItems(
+    database,
+    rows.map((row) => row.id),
+  );
+  const qrAssetIds = rows.flatMap((row) => (row.paymentQrAssetId ? [row.paymentQrAssetId] : []));
+  const qrAssets = await database
+    .select({ id: assets.id, path: assets.path })
+    .from(assets)
+    .where(inArray(assets.id, qrAssetIds));
+
+  return { items, qrPaths: new Map(qrAssets.map((asset) => [asset.id, asset.path])) };
+}
+
+function toPublicOrder(order: Order, { items, qrPaths }: OrderDetails) {
+  const qrPath = order.paymentQrAssetId ? qrPaths.get(order.paymentQrAssetId) : undefined;
   const { recipientName, phone, line1, line2, barangay, city, province, postalCode } = order;
 
   return {
     id: order.id,
     orderNumber: `ORD-${String(order.orderNumber).padStart(6, '0')}`,
     status: order.status,
-    paymentMethod: order.paymentMethod,
+    paymentType: order.paymentType,
+    paymentProvider: order.paymentProvider,
     paymentStatus: order.paymentStatus,
     paymentDueAt: order.paymentDueAt,
-    paymentDetails:
-      order.status === 'awaiting_payment' ? (paymentDetails(order.paymentMethod) ?? null) : null,
+    payment:
+      order.status === 'awaiting_payment' && order.paymentType === 'manual'
+        ? {
+            providerName: order.paymentProvider,
+            accountName: order.paymentAccountName,
+            accountNumber: order.paymentAccountNumber,
+            qrUrl: qrPath ? fileUrl(qrPath) : null,
+          }
+        : null,
     ...toOrderTotals(order),
     taxRatePercent: order.taxRateBasisPoints / 100,
     pricesIncludeTax: order.pricesIncludeTax,
@@ -200,7 +219,7 @@ export async function createOrder(userId: string, body: CreateOrderBody) {
 
     if (existing) {
       return {
-        order: toPublicOrder(existing, await findItems(tx, [existing.id])),
+        order: toPublicOrder(existing, await findDetails(tx, [existing])),
         created: false,
       };
     }
@@ -220,7 +239,7 @@ export async function createOrder(userId: string, body: CreateOrderBody) {
 
     await tx.delete(cartItems).where(eq(cartItems.userId, userId));
 
-    return { order: toPublicOrder(order, await findItems(tx, [order.id])), created: true };
+    return { order: toPublicOrder(order, await findDetails(tx, [order])), created: true };
   });
 }
 
@@ -255,11 +274,7 @@ export async function createGuestOrder(body: GuestOrderBody) {
 
 async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   const { owner, address, items, paymentMethod, expectedTotalCents, idempotencyKey } = input;
-  const isUnpaidOnPlacing = paymentMethod !== 'cod';
-
-  if (isUnpaidOnPlacing && !paymentDetails(paymentMethod)) {
-    throw new AppError(409, 'This payment method is not available');
-  }
+  const method = await findPaymentMethod(tx, paymentMethod);
 
   const unavailable = items.filter((item) => !item.variantActive || !item.productActive);
 
@@ -281,9 +296,14 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
     .values({
       ...owner,
       idempotencyKey,
-      status: isUnpaidOnPlacing ? 'awaiting_payment' : 'pending',
-      paymentMethod,
-      paymentDueAt: isUnpaidOnPlacing
+      status: method ? 'awaiting_payment' : 'pending',
+      paymentType: method ? 'manual' : 'cod',
+      paymentMethodId: method?.id,
+      paymentProvider: method?.providerName,
+      paymentAccountName: method?.accountName,
+      paymentAccountNumber: method?.accountNumber,
+      paymentQrAssetId: method?.qrAssetId,
+      paymentDueAt: method
         ? new Date(Date.now() + env.PAYMENT_WINDOW_HOURS * 60 * 60 * 1000)
         : null,
       subtotalCents: pricing.subtotalCents,
@@ -326,6 +346,19 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   return order;
 }
 
+async function findPaymentMethod(tx: Transaction, paymentMethod: string) {
+  if (paymentMethod === 'cod') return undefined;
+
+  const [method] = await tx
+    .select()
+    .from(paymentMethods)
+    .where(and(eq(paymentMethods.id, paymentMethod), eq(paymentMethods.enabled, true)));
+
+  if (!method) throw new AppError(409, 'This payment method is not available');
+
+  return method;
+}
+
 export async function getGuestOrder(token: string) {
   const id = readGuestToken(token);
   const [order] = id ? await db.select().from(orders).where(guestOrderById(id)) : [];
@@ -338,7 +371,7 @@ export async function getGuestOrder(token: string) {
 export async function submitOwnPayment(userId: string, id: string, reference: string) {
   return lockOrder(and(eq(orders.id, id), eq(orders.userId, userId)), id, async (tx, order) => {
     const updated = await submitPayment(tx, order, reference);
-    return toPublicOrder(updated, await findItems(tx, [id]));
+    return toPublicOrder(updated, await findDetails(tx, [updated]));
   });
 }
 
@@ -359,12 +392,10 @@ async function submitPayment(tx: Transaction, order: Order, reference: string) {
   }
 
   try {
-    // The method is the provider for now. A payment provider would use its own name.
     await tx.insert(payments).values({
       orderId: order.id,
-      method: order.paymentMethod,
       amountCents: order.totalCents,
-      provider: order.paymentMethod,
+      provider: order.paymentProvider ?? order.paymentType,
       reference,
     });
   } catch (error) {
@@ -463,12 +494,9 @@ export async function listOrders(userId: string, { page, limit, status }: ListOr
     db.select({ total: count() }).from(orders).where(where),
   ]);
 
-  const items = await findItems(
-    db,
-    rows.map((row) => row.id),
-  );
+  const details = await findDetails(db, rows);
 
-  return { items: rows.map((row) => toPublicOrder(row, items)), total: totals[0]?.total ?? 0 };
+  return { items: rows.map((row) => toPublicOrder(row, details)), total: totals[0]?.total ?? 0 };
 }
 
 export async function getOrder(userId: string, id: string) {
@@ -479,7 +507,7 @@ export async function getOrder(userId: string, id: string) {
 
   if (!order) notFound(id);
 
-  return toPublicOrder(order, await findItems(db, [id]));
+  return toPublicOrder(order, await findDetails(db, [order]));
 }
 
 export async function cancelOwnOrder(userId: string, id: string) {
@@ -490,7 +518,9 @@ export async function cancelOwnOrder(userId: string, id: string) {
       throw new AppError(409, 'This order can no longer be cancelled');
     }
 
-    return toPublicOrder(await cancelOrder(tx, order), await findItems(tx, [id]));
+    const cancelled = await cancelOrder(tx, order);
+
+    return toPublicOrder(cancelled, await findDetails(tx, [cancelled]));
   });
 }
 
@@ -513,13 +543,10 @@ export async function listAllOrders({ page, limit, status, paymentStatus }: List
     db.select({ total: count() }).from(orders).where(where),
   ]);
 
-  const items = await findItems(
-    db,
-    rows.map((row) => row.id),
-  );
+  const details = await findDetails(db, rows);
 
   return {
-    items: rows.map((row) => toAdminOrder(row, items)),
+    items: rows.map((row) => toAdminOrder(row, details)),
     total: totals[0]?.total ?? 0,
   };
 }
@@ -534,7 +561,7 @@ export async function getAnyOrder(id: string) {
 
   if (!order) notFound(id);
 
-  return toAdminOrder(order, await findItems(db, [id]));
+  return toAdminOrder(order, await findDetails(db, [order]));
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
@@ -552,7 +579,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
     await tx.update(orders).set({ status }).where(eq(orders.id, id));
 
     // Delivering a COD order means the customer has handed the cash to the courier.
-    if (status === 'delivered' && order.paymentMethod === 'cod') {
+    if (status === 'delivered' && order.paymentType === 'cod') {
       await markPaid(tx, id);
     }
   });
@@ -727,10 +754,10 @@ async function findItemAssets(tx: Transaction, items: CheckoutItem[]) {
 
 function toAdminOrder(
   row: Order & { customerEmail: string | null; paymentReference: string | null },
-  items: ItemRow[],
+  details: OrderDetails,
 ) {
   return {
-    ...toPublicOrder(row, items),
+    ...toPublicOrder(row, details),
     userId: row.userId,
     isGuest: row.guestEmail !== null,
     customerEmail: row.customerEmail ?? row.guestEmail,
@@ -740,7 +767,7 @@ function toAdminOrder(
 
 async function toGuestOrder(database: Database, order: Order) {
   return {
-    ...toPublicOrder(order, await findItems(database, [order.id])),
+    ...toPublicOrder(order, await findDetails(database, [order])),
     guestToken: `${order.id}.${signGuestOrder(order.id)}`,
   };
 }

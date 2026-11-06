@@ -27,8 +27,6 @@ export default defineConfig({
       PRICES_INCLUDE_TAX: 'true',
       SHIPPING_FEE_CENTS: '10000',
       PAYMENT_WINDOW_HOURS: '24',
-      PAYMENT_GCASH_NUMBER: '09170000000',
-      PAYMENT_BANK_DETAILS: 'Test Bank 1234567890',
       UPLOADS_DIR: join(tmpdir(), 'simple-express-test-uploads'),
       S3_BUCKET: '',
       S3_REGION: '',

@@ -152,6 +152,7 @@ If a simpler solution works just as well, choose the simpler solution.
 ## Git and Project Changes
 
 - Before starting new changes, ask whether to commit the current work.
+- Never merge into `main`, even when asked to push. Open a pull request instead, and the user merges it manually.
 - Keep changes focused on the requested task.
 - Do not modify unrelated files.
 - Follow existing naming conventions.

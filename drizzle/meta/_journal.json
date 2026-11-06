@@ -85,6 +85,20 @@
       "when": 1793941516972,
       "tag": "0011_add_payments_and_guests",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793946447312,
+      "tag": "0012_add_payment_methods",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793946448816,
+      "tag": "0013_remove_old_payment_method",
+      "breakpoints": true
     }
   ]
 }

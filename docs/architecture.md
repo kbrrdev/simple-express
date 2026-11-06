@@ -93,19 +93,20 @@ Central route registration. Module routes are mounted under `/api`.
 
 ## Routes
 
-| Path              | Description                   |
-| ----------------- | ----------------------------- |
-| `/health`         | API and database health check |
-| `/api-docs`       | Swagger UI, not in production |
-| `/api-docs.json`  | OpenAPI, not in production    |
-| `/api/addresses`  | Addresses module              |
-| `/api/assets`     | Assets module                 |
-| `/api/auth`       | Auth module                   |
-| `/api/blogs`      | Blogs module                  |
-| `/api/cart`       | Cart module                   |
-| `/api/categories` | Categories module             |
-| `/api/orders`     | Orders module                 |
-| `/api/products`   | Products module               |
+| Path                   | Description                   |
+| ---------------------- | ----------------------------- |
+| `/health`              | API and database health check |
+| `/api-docs`            | Swagger UI, not in production |
+| `/api-docs.json`       | OpenAPI, not in production    |
+| `/api/addresses`       | Addresses module              |
+| `/api/assets`          | Assets module                 |
+| `/api/auth`            | Auth module                   |
+| `/api/blogs`           | Blogs module                  |
+| `/api/cart`            | Cart module                   |
+| `/api/categories`      | Categories module             |
+| `/api/orders`          | Orders module                 |
+| `/api/payment-methods` | Payment methods module        |
+| `/api/products`        | Products module               |
 
 ## Database
 
@@ -153,15 +154,23 @@ Blogs are public to read. Only admins can create, update, and delete them.
 - Adding to the cart checks the quantity limit inside the upsert, so parallel requests cannot exceed it.
 - Guest carts are kept by the client. `POST /api/cart/preview` prices them, and `POST /api/cart/merge` moves them into the user's cart after login, keeping the higher quantity for items in both.
 
+## Payment Methods
+
+- `payment_methods` lists the methods admins manage, such as GCash, banks, and PayPal, so adding one needs no code. Accounts can be any text, as no single format fits them all.
+- The public list leaves out account details, which are only shown on an order after checkout.
+- A method that orders use cannot be deleted, only turned off.
+- A provider such as Stripe would be a row with an `online` type and no account details. Its keys belong in `.env`, and its code and webhook in their own files.
+
 ## Orders
 
 - Orders copy the prices, product details, tax, and address they were placed with, so that later changes never alter them.
-- Order statuses, payment statuses, and payment methods are the store's own enums. A future payment provider's statuses are mapped onto them.
+- Order statuses, payment statuses, and payment types are the store's own enums. A future payment provider's statuses are mapped onto them.
 - Checkout runs in one transaction. It locks the user, handles repeated `idempotencyKey` values, reads prices from the database, compares the total with `expectedTotalCents`, reduces stock with a conditional update in variant order, then saves the order and empties the cart.
 - Queries inside the transaction use its connection, so that a burst of checkouts cannot exhaust the pool.
 - Status changes lock the order row, so that stock is only returned once. `adminTransitions` in `order.service.ts` lists the allowed moves.
 - `markPaid` is the only way an order becomes paid, and is safe to repeat, so a future webhook can use it. `calculateShipping` is the only place that sets the fee.
-- GCash and bank transfer orders start as `awaiting_payment`, and a row in `payments` records the reference. The unique provider and reference stop a payment being counted twice.
+- Manual orders start as `awaiting_payment`, and a row in `payments` records the reference. The unique provider and reference stop a payment being counted twice.
+- Orders copy the provider, account name, account number, and QR of the `payment_methods` row they were placed with. The QR has a foreign key, so a file an unpaid order still shows cannot be deleted.
 - `expireUnpaidOrders` runs every 5 minutes from `index.ts`. It uses `FOR UPDATE SKIP LOCKED`, so several servers can run it safely, and it skips orders with a submitted reference.
 - Guest orders have a `guest_email` and no `user_id`, and are never linked to accounts. Their `guestToken` is the order ID with an HMAC signature, so a retry can return the same link without storing it. Changing `JWT_SECRET` invalidates these links.
 - Tax is calculated per line and on shipping. `TAX_RATE_PERCENT` and `PRICES_INCLUDE_TAX` set it, and both are saved on each order.

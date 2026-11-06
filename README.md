@@ -140,6 +140,7 @@ src/
     ├── cart/
     ├── categories/
     ├── orders/
+    ├── payment-methods/
     └── products/
 
 drizzle/
@@ -368,7 +369,7 @@ A merge keeps the higher quantity for an item in both carts, so retrying one is 
 
 ## Orders
 
-Customers check out with cash on delivery, GCash, or bank transfer, and guests can check out without an account. Tax and shipping are added at checkout, and an order keeps its own copy of its prices and address, so later changes never alter it.
+Customers check out with cash on delivery or a manual payment method, and guests can check out without an account. Tax and shipping are added at checkout, and an order keeps its own copy of its prices and address, so later changes never alter it.
 
 | Endpoint | Description | Access |
 |---|---|---|
@@ -410,15 +411,32 @@ awaiting_payment → pending → confirmed → shipped → delivered
 
 ### Payments
 
-| Method | Customers | Guests |
+Checkout takes a `paymentMethod`, which is `cod` or the ID of a manual method. Guests cannot use COD.
+
+Admins manage the manual methods, so GCash, Maya, banks, and PayPal can be added without code changes:
+
+| Endpoint | Description | Access |
 |---|---|---|
-| `cod` | Yes | No |
-| `gcash` | Yes | Yes |
-| `bank_transfer` | Yes | Yes |
+| `GET /api/payment-methods` | List enabled methods, without account details | Public |
+| `GET /api/payment-methods/admin` | List all methods with account details | Admin |
+| `POST /api/payment-methods` | Add a method | Admin |
+| `PATCH /api/payment-methods/:id` | Update or turn off a method | Admin |
+| `DELETE /api/payment-methods/:id` | Delete a method no order has used | Admin |
 
-GCash and bank transfer are manual:
+```json
+{
+  "providerName": "GCash",
+  "accountName": "Juan Dela Cruz",
+  "accountNumber": "09171234567",
+  "qrAssetId": "..."
+}
+```
 
-1. The order starts as `awaiting_payment`, and returns `paymentDetails` and `paymentDueAt`.
+`accountNumber` can be a mobile number, bank account number, or email. To add a QR code, upload it through `POST /api/assets` and send its ID as `qrAssetId`. QR codes are static, so customers still enter the amount.
+
+Manual payments work like this:
+
+1. The order starts as `awaiting_payment`, and returns `paymentDueAt` and a `payment` object with `providerName`, `accountName`, `accountNumber`, and `qrUrl`. Show the account name, so customers can check who they are paying.
 2. The customer pays, then submits the reference, which sets the payment to `submitted`.
 3. An admin filters orders with `?paymentStatus=submitted`, checks the reference, and confirms or rejects it.
 
@@ -428,7 +446,7 @@ Unpaid orders are cancelled after `PAYMENT_WINDOW_HOURS`, and their stock return
 
 Refunds happen outside the system. Record them with the refund endpoint once the order is cancelled, returned, or delivered.
 
-Set `PAYMENT_GCASH_NUMBER` and `PAYMENT_BANK_DETAILS` in `.env`. Leaving one empty turns that method off.
+Orders copy the account they were placed with, so a customer keeps seeing the account they were told to pay, even if the method later changes or is turned off.
 
 ### Guest Checkout
 
@@ -438,11 +456,12 @@ Guest orders are never linked to an account, even if the email matches one, as e
 
 ### Adding a Payment Provider
 
-No payment provider is connected. To add one:
+No payment provider is connected. To add one, such as Stripe:
 
-1. Add its method to the `payment_method` enum.
-2. Add a webhook route that verifies the provider's signature, then translates its status.
-3. Save its reference and raw status in `payments`, and call `markPaid`, which is safe to repeat.
+1. Add an `online` value to `payment_method_type` and `payment_type`, and a row in `payment_methods`, which will have no account details.
+2. Keep its API keys in `.env`, and its code in its own file.
+3. Add a webhook route that verifies the provider's signature, then translates its status.
+4. Save its reference and raw status in `payments`, and call `markPaid`, which is safe to repeat.
 
 ### Tax and Shipping
 

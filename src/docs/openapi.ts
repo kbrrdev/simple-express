@@ -14,6 +14,11 @@ import {
 } from '../modules/categories/category.openapi';
 import { orderParameters, orderPaths, orderSchemas } from '../modules/orders/order.openapi';
 import {
+  paymentMethodParameters,
+  paymentMethodPaths,
+  paymentMethodSchemas,
+} from '../modules/payment-methods/payment-method.openapi';
+import {
   productParameters,
   productPaths,
   productSchemas,
@@ -38,6 +43,7 @@ export const openApiDocument = {
     { name: 'Categories' },
     { name: 'Products' },
     { name: 'Cart' },
+    { name: 'Payment Methods' },
     { name: 'Orders' },
     { name: 'Addresses' },
     { name: 'Assets' },
@@ -69,6 +75,7 @@ export const openApiDocument = {
     ...categoryPaths,
     ...productPaths,
     ...cartPaths,
+    ...paymentMethodPaths,
     ...orderPaths,
     ...addressPaths,
     ...assetPaths,
@@ -83,6 +90,7 @@ export const openApiDocument = {
       ...productParameters,
       ...cartParameters,
       ...orderParameters,
+      ...paymentMethodParameters,
       ...addressParameters,
     },
     responses: {
@@ -105,6 +113,7 @@ export const openApiDocument = {
       ...productSchemas,
       ...cartSchemas,
       ...orderSchemas,
+      ...paymentMethodSchemas,
       ...addressSchemas,
       ...assetSchemas,
       PageMeta: {

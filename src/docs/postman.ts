@@ -54,6 +54,7 @@ const idVariablesByTag: Record<string, string> = {
   Blogs: 'blogId',
   Categories: 'categoryId',
   Orders: 'orderId',
+  'Payment Methods': 'paymentMethodId',
   Products: 'productId',
 };
 
@@ -63,6 +64,7 @@ const createdIdVariables: Record<string, string> = {
   '/api/blogs': 'blogId',
   '/api/categories': 'categoryId',
   '/api/orders': 'orderId',
+  '/api/payment-methods': 'paymentMethodId',
   '/api/products': 'productId',
   '/api/products/{id}/images': 'imageId',
   '/api/products/{id}/variants': 'variantId',
@@ -97,7 +99,12 @@ function sampleValue(input: Schema): unknown {
           name === 'refreshToken' ||
           property.example !== undefined,
       )
-      .map(([name, property]) => [name, bodyVariables[name] ?? sampleValue(property)]);
+      .map(([name, property]) => [
+        name,
+        name === 'paymentMethod' && property.format === 'uuid'
+          ? '{{paymentMethodId}}'
+          : (bodyVariables[name] ?? sampleValue(property)),
+      ]);
 
     return Object.fromEntries(entries);
   }
@@ -243,6 +250,7 @@ export function buildPostmanCollection() {
         'guestToken',
         'imageId',
         'orderId',
+        'paymentMethodId',
         'productId',
         'variantId',
       ].map((key) => ({ key, value: '' })),

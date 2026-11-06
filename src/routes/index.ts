@@ -12,6 +12,7 @@ import { blogRoutes } from '../modules/blogs/blog.routes';
 import { cartRoutes } from '../modules/cart/cart.routes';
 import { categoryRoutes } from '../modules/categories/category.routes';
 import { orderRoutes } from '../modules/orders/order.routes';
+import { paymentMethodRoutes } from '../modules/payment-methods/payment-method.routes';
 import { productRoutes } from '../modules/products/product.routes';
 
 const apiRoutes = Router();
@@ -24,6 +25,7 @@ apiRoutes.use('/blogs', blogRoutes);
 apiRoutes.use('/cart', cartRoutes);
 apiRoutes.use('/categories', categoryRoutes);
 apiRoutes.use('/orders', orderRoutes);
+apiRoutes.use('/payment-methods', paymentMethodRoutes);
 apiRoutes.use('/products', productRoutes);
 
 export const routes = Router();
