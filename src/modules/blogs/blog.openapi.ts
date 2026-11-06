@@ -22,7 +22,7 @@ export const blogPaths = {
   '/api/blogs': {
     get: {
       tags,
-      summary: 'List blogs, newest first',
+      summary: 'List published blogs, newest first',
       parameters: [
         {
           name: 'page',
@@ -33,11 +33,6 @@ export const blogPaths = {
           name: 'limit',
           in: 'query',
           schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
-        },
-        {
-          name: 'published',
-          in: 'query',
-          schema: { type: 'boolean' },
         },
       ],
       responses: {
@@ -88,10 +83,63 @@ export const blogPaths = {
       },
     },
   },
+  '/api/blogs/admin': {
+    get: {
+      tags,
+      summary: 'List all blogs, including drafts (admin)',
+      security,
+      parameters: [
+        { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+        {
+          name: 'limit',
+          in: 'query',
+          schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+        { name: 'published', in: 'query', schema: { type: 'boolean' } },
+      ],
+      responses: {
+        200: {
+          description: 'A page of blogs',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['data', 'meta'],
+                properties: {
+                  data: { type: 'array', items: { $ref: '#/components/schemas/Blog' } },
+                  meta: { $ref: '#/components/schemas/PageMeta' },
+                },
+              },
+            },
+          },
+        },
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        500: serverError,
+      },
+    },
+  },
+  '/api/blogs/admin/{id}': {
+    get: {
+      tags,
+      summary: 'Get any blog, including drafts (admin)',
+      security,
+      parameters: [blogId],
+      responses: {
+        200: { description: 'The blog', content: blogContent },
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        404: notFound,
+        500: serverError,
+      },
+    },
+  },
   '/api/blogs/{id}': {
     get: {
       tags,
-      summary: 'Get a blog',
+      summary: 'Get a published blog',
       parameters: [blogId],
       responses: {
         200: { description: 'The blog', content: blogContent },
@@ -180,7 +228,7 @@ export const blogSchemas = {
       title: { type: 'string', minLength: 1, maxLength: 255, example: 'Hello' },
       content: { type: 'string', minLength: 1, example: 'First post' },
       author: { type: 'string', minLength: 1, maxLength: 100, example: 'Jane' },
-      published: { type: 'boolean', default: false },
+      published: { type: 'boolean', default: false, example: true },
       coverAssetId: { type: ['string', 'null'], format: 'uuid' },
     },
   },

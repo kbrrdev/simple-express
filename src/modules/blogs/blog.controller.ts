@@ -15,6 +15,17 @@ export async function list(req: Request, res: Response) {
   });
 }
 
+export async function listForAdmin(req: Request, res: Response) {
+  const query = req.query as unknown as ListBlogsQuery;
+  const { items, total } = await blogService.listBlogs(query, true);
+
+  res.json({ data: items, meta: { page: query.page, limit: query.limit, total } });
+}
+
+export async function getForAdmin(req: Request<IdParams>, res: Response) {
+  res.json({ data: await blogService.getBlog(req.params.id, true) });
+}
+
 export async function get(req: Request<IdParams>, res: Response) {
   res.json({ data: await blogService.getBlog(req.params.id) });
 }

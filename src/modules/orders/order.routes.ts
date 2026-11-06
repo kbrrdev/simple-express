@@ -15,12 +15,22 @@ import {
   updateOrderStatusBody,
 } from './order.validation';
 
+const tooManyRequests = { error: { message: 'Too many requests, try again later' } };
+
 export const guestOrderLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: tooManyRequests,
+});
+
+export const guestPaymentLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  message: { error: { message: 'Too many requests, try again later' } },
+  message: tooManyRequests,
 });
 
 export const orderRoutes = Router();
@@ -38,7 +48,7 @@ orderRoutes.post(
 orderRoutes.get('/guest/:token', validate('params', guestTokenParams), controller.getGuest);
 orderRoutes.post(
   '/guest/:token/payment',
-  guestOrderLimiter,
+  guestPaymentLimiter,
   validate('params', guestTokenParams),
   validate('body', submitPaymentBody),
   controller.submitGuestPayment,

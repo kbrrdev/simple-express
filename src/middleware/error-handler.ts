@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { AppError } from '../lib/app-error';
+import { toSafeLog } from '../lib/db-errors';
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
   next(new AppError(404, `Route not found: ${req.method} ${req.path}`));
@@ -22,6 +23,6 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _ne
     return;
   }
 
-  console.error(error);
+  console.error(toSafeLog(error));
   res.status(500).json({ error: { message: 'Internal server error' } });
 };

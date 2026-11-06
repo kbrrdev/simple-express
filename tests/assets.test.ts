@@ -438,7 +438,7 @@ describe('variant images', () => {
 });
 
 describe('blog covers', () => {
-  const blog = { title: 'Hello', content: 'First post', author: 'Jane' };
+  const blog = { title: 'Hello', content: 'First post', author: 'Jane', published: true };
 
   it('sets, shows and clears a cover', async () => {
     const asset = await upload();

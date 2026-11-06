@@ -326,7 +326,7 @@
       "name": "Blogs",
       "item": [
         {
-          "name": "List blogs, newest first",
+          "name": "List published blogs, newest first",
           "request": {
             "method": "GET",
             "auth": {
@@ -351,11 +351,6 @@
                 {
                   "key": "limit",
                   "value": "20",
-                  "disabled": true
-                },
-                {
-                  "key": "published",
-                  "value": "",
                   "disabled": true
                 }
               ],
@@ -397,7 +392,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Hello\",\n  \"content\": \"First post\",\n  \"author\": \"Jane\"\n}",
+              "raw": "{\n  \"title\": \"Hello\",\n  \"content\": \"First post\",\n  \"author\": \"Jane\",\n  \"published\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -407,7 +402,69 @@
           }
         },
         {
-          "name": "Get a blog",
+          "name": "List all blogs, including drafts (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/blogs/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "blogs",
+                "admin"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                },
+                {
+                  "key": "published",
+                  "value": "",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Get any blog, including drafts (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/blogs/admin/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "blogs",
+                "admin",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{blogId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get a published blog",
           "request": {
             "method": "GET",
             "auth": {
@@ -1639,7 +1696,7 @@
             "auth": {
               "type": "noauth"
             },
-            "description": "Guests cannot use COD. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.",
+            "description": "Guests cannot use COD, and an order can have up to 10 items. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/orders/guest",

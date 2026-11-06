@@ -406,6 +406,93 @@ describe('checkout', () => {
   });
 });
 
+describe('very large orders', () => {
+  it('handles totals beyond a 32-bit integer', async () => {
+    await db
+      .update(productVariants)
+      .set({ priceCents: 2000000000, stock: 200 })
+      .where(eq(productVariants.id, medium));
+    await addToCart(medium, 99);
+
+    const response = await checkout(198000010000).expect(201);
+
+    expect(response.body.data).toMatchObject({
+      subtotalCents: 198000000000,
+      totalCents: 198000010000,
+    });
+
+    const saved = await api()
+      .get(`/api/orders/${response.body.data.id}`)
+      .set(bearer(token))
+      .expect(200);
+
+    expect(saved.body.data.items[0].lineTotalCents).toBe(198000000000);
+  });
+});
+
+describe('open unpaid orders', () => {
+  afterEach(() => {
+    env.MAX_OPEN_UNPAID_ORDERS = 1000;
+  });
+
+  it('stops a customer holding too many, keeping the cart', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 2;
+    await placeOrder(1);
+    await placeOrder(1);
+    await addToCart(medium, 1);
+
+    const response = await checkout(122000).expect(409);
+
+    expect(response.body.error.message).toBe(
+      'Pay or cancel your open orders before placing another',
+    );
+    expect(await stockOf(medium)).toBe(8);
+    expect(await db.select().from(cartItems)).toHaveLength(1);
+  });
+
+  it('frees a slot when an order is cancelled or moves on', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 2;
+    const first = await placeOrder(1);
+    const second = await placeOrder(1);
+
+    await cancel(first.id).expect(200);
+    await setStatus(second.id, 'confirmed').expect(200);
+
+    await placeOrder(1);
+    await placeOrder(1);
+  });
+
+  it('does not affect other customers', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 1;
+    await placeOrder(1);
+    await addToCart(medium, 1, otherToken);
+
+    await checkout(122000, { addressId: otherAddressId }, otherToken).expect(201);
+  });
+
+  it('still returns the original order to a retry', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 1;
+    await addToCart(medium, 1);
+    const idempotencyKey = randomUUID();
+
+    const first = await checkout(122000, { idempotencyKey }).expect(201);
+    const retry = await checkout(122000, { idempotencyKey }).expect(200);
+
+    expect(retry.body.data.id).toBe(first.body.data.id);
+  });
+
+  it('cannot be passed with parallel requests', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 1;
+    await placeOrder(1);
+    await addToCart(medium, 1);
+
+    const responses = await Promise.all(Array.from({ length: 6 }, () => checkout(122000)));
+
+    expect(responses.every(({ status }) => status === 409)).toBe(true);
+    expect(await db.select().from(orders)).toHaveLength(1);
+  });
+});
+
 describe('repeated checkouts', () => {
   it('returns the original order for a repeated key', async () => {
     await addToCart(medium, 1);

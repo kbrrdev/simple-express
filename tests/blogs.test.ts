@@ -6,7 +6,8 @@ import { db, pool } from '../src/db';
 import { blogs, users } from '../src/db/schema';
 
 const password = 'correct-horse-battery';
-const blog = { title: 'Hello', content: 'First post', author: 'Jane' };
+const blog = { title: 'Hello', content: 'First post', author: 'Jane', published: true };
+const draft = { title: 'Big sale', content: 'Secret', author: 'Jane' };
 const missingId = '00000000-0000-4000-8000-000000000000';
 
 const api = () => request(app);
@@ -96,6 +97,56 @@ describe('blogs', () => {
       .set(bearer(adminToken))
       .send({ ...blog, authorId: missingId })
       .expect(400);
+  });
+
+  it('hides drafts from the public list and direct links', async () => {
+    const created = await api().post('/api/blogs').set(bearer(adminToken)).send(draft).expect(201);
+    await createBlog();
+
+    const list = await api().get('/api/blogs').expect(200);
+
+    expect(list.body.meta.total).toBe(1);
+    expect(list.body.data[0].title).toBe(blog.title);
+    await api().get(`/api/blogs/${created.body.data.id}`).expect(404);
+  });
+
+  it('does not reveal drafts through a filter', async () => {
+    await api().post('/api/blogs').set(bearer(adminToken)).send(draft).expect(201);
+
+    await api().get('/api/blogs?published=false').expect(400);
+  });
+
+  it('shows drafts to admins only', async () => {
+    const created = await api().post('/api/blogs').set(bearer(adminToken)).send(draft).expect(201);
+    const { id } = created.body.data;
+
+    await api().get('/api/blogs/admin').expect(401);
+    await api().get('/api/blogs/admin').set(bearer(customerToken)).expect(403);
+    await api().get(`/api/blogs/admin/${id}`).set(bearer(customerToken)).expect(403);
+
+    const list = await api().get('/api/blogs/admin').set(bearer(adminToken)).expect(200);
+    const single = await api().get(`/api/blogs/admin/${id}`).set(bearer(adminToken)).expect(200);
+    const drafts = await api()
+      .get('/api/blogs/admin?published=false')
+      .set(bearer(adminToken))
+      .expect(200);
+
+    expect(list.body.meta.total).toBe(1);
+    expect(single.body.data.title).toBe(draft.title);
+    expect(drafts.body.meta.total).toBe(1);
+  });
+
+  it('lets admins update a draft and read the result', async () => {
+    const created = await api().post('/api/blogs').set(bearer(adminToken)).send(draft).expect(201);
+
+    const response = await api()
+      .patch(`/api/blogs/${created.body.data.id}`)
+      .set(bearer(adminToken))
+      .send({ published: true })
+      .expect(200);
+
+    expect(response.body.data.published).toBe(true);
+    await api().get(`/api/blogs/${created.body.data.id}`).expect(200);
   });
 
   it('returns 404 for a missing blog', async () => {

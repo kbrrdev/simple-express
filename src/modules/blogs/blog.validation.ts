@@ -23,6 +23,9 @@ export const blogParams = Joi.object({
 export const listBlogsQuery = Joi.object<ListBlogsQuery>({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
+});
+
+export const listAllBlogsQuery = listBlogsQuery.keys({
   published: Joi.boolean(),
 });
 
