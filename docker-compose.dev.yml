@@ -6,6 +6,7 @@ services:
       target: dev
     environment:
       NODE_ENV: development
+      APP_ENV: development
     command: sh -c "npm run db:migrate && unset MIGRATION_DATABASE_URL && exec npm run dev"
     develop:
       watch:

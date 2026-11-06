@@ -47,6 +47,7 @@ services:
     logging: *logging
     environment:
       PORT: 3000
+      APP_ENV: ${APP_ENV:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
@@ -67,7 +68,8 @@ services:
       MIGRATION_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-blog}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
     ports:
-      - '${PORT:-3000}:3000'
+      # Caddy is the way in. Docker can bypass firewall rules on public ports.
+      - '127.0.0.1:${PORT:-3000}:3000'
     volumes:
       - uploads-data:/app/uploads
     depends_on:

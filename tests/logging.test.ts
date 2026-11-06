@@ -685,6 +685,16 @@ describe('the logger', () => {
     output.level = previousLevel;
   });
 
+  it('names the environment on each line', () => {
+    const { lines, destination } = capture();
+    const output = createLogger(destination);
+    output.level = 'info';
+
+    output.info('Something happened');
+
+    expect(JSON.parse(lines[0] ?? '{}').env).toBe('development');
+  });
+
   it('hides sensitive fields, even if passed by mistake', () => {
     const { lines, destination } = capture();
     const output = createLogger(destination);
