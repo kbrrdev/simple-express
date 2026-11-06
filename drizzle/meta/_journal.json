@@ -64,6 +64,13 @@
       "when": 1793906705036,
       "tag": "0008_create_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793937352731,
+      "tag": "0009_harden_auth",
+      "breakpoints": true
     }
   ]
 }

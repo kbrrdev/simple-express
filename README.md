@@ -269,6 +269,7 @@ Clients log in with an email and password and receive two tokens:
 | `POST /api/auth/register` | Create a user | No |
 | `POST /api/auth/login` | Start a session | No |
 | `POST /api/auth/refresh` | Get new tokens | No |
+| `POST /api/auth/change-password` | Change the password, ending other sessions | Yes |
 | `POST /api/auth/logout` | End the current session | Yes |
 | `POST /api/auth/logout-all` | End all sessions for the user | Yes |
 | `GET /api/auth/me` | Get the current user | Yes |
@@ -278,7 +279,9 @@ Login requires a `client` value:
 - `web`: the refresh token is set as an `httpOnly` cookie. Keep the access token in memory, and call `/api/auth/refresh` with credentials included.
 - `native`: the refresh token is returned in the response body. Keep it in secure storage, and send it as `refreshToken` in the body of `/api/auth/refresh`.
 
-Every access token belongs to a session, and the session is checked on each protected request, so logout takes effect immediately. Reusing an old refresh token more than 30 seconds after it was replaced revokes the session.
+Every access token belongs to a session, and the session is checked on each protected request, so logout takes effect immediately. Each refresh token holds its session ID and is signed. Reusing any old refresh token revokes the session, apart from the one just replaced, which is allowed for 30 seconds for retries and parallel tabs.
+
+Passwords must be 8 to 128 characters and cannot be a common password. After five failed logins, an email is delayed for 30 seconds, doubling up to five minutes, even with the right password. A quiet 15 minutes resets this.
 
 To protect a route, add the `requireAuth` middleware. The current user is then available in `res.locals.auth`. Reading blogs is public.
 

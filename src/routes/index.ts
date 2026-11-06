@@ -47,7 +47,6 @@ if (!usesS3) {
       index: false,
       maxAge: '1y',
       immutable: true,
-      setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
     }),
   );
 }

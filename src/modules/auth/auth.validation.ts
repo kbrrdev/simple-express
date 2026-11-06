@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { commonPasswords } from './common-passwords';
 
 export interface RegisterBody {
   email: string;
@@ -13,17 +14,36 @@ export interface RefreshBody {
   refreshToken?: string;
 }
 
+export interface ChangePasswordBody {
+  currentPassword: string;
+  newPassword: string;
+}
+
 const email = Joi.string().trim().lowercase().email({ tlds: false }).max(255).required();
+
+const newPassword = Joi.string()
+  .min(8)
+  .max(128)
+  .required()
+  .custom((value: string, helpers) =>
+    commonPasswords.has(value.toLowerCase()) ? helpers.error('password.common') : value,
+  )
+  .messages({ 'password.common': 'This password is too common' });
 
 export const registerBody = Joi.object<RegisterBody>({
   email,
-  password: Joi.string().min(8).max(128).required(),
+  password: newPassword,
 });
 
 export const loginBody = Joi.object<LoginBody>({
   email,
   password: Joi.string().max(128).required(),
   client: Joi.string().valid('web', 'native').required(),
+});
+
+export const changePasswordBody = Joi.object<ChangePasswordBody>({
+  currentPassword: Joi.string().max(128).required(),
+  newPassword,
 });
 
 export const refreshBody = Joi.object<RefreshBody>({
