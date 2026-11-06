@@ -42,23 +42,7 @@ Pricing and limits change, so check each provider's site before relying on them.
 
 **What it is for:** warning about known vulnerabilities in packages, and opening pull requests to update them.
 
-**How to implement:**
-
-1. Turn on **Dependabot alerts** on the same settings page.
-2. Add `.github/dependabot.yml`:
-
-```yaml
-version: 2
-updates:
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: weekly
-```
+**How to implement:** updates are set up in [`.github/dependabot.yml`](../.github/dependabot.yml). Also turn on **Dependabot alerts** on the same settings page.
 
 **Usage:** review the pull requests it opens, and merge them when the checks pass. Alerts appear under the **Security** tab.
 
@@ -66,35 +50,7 @@ updates:
 
 **What it is for:** running the project's checks on every pull request, so that broken or vulnerable code is not merged unnoticed.
 
-**How to implement:** add `.github/workflows/ci.yml`. `docker-compose.yml` needs `JWT_SECRET` and `APP_DB_PASSWORD` even to start the test database, so the workflow sets test-only values.
-
-```yaml
-name: CI
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    env:
-      JWT_SECRET: ci-only-secret-at-least-32-characters-long
-      APP_DB_PASSWORD: ci-only-password
-      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5434/blog_test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm audit --omit=dev --audit-level=high
-      - run: npm test
-```
+**How to implement:** already set up in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml). `docker-compose.yml` needs `JWT_SECRET`, `APP_DB_PASSWORD`, and `POSTGRES_PASSWORD` even to start the test database, so the workflow sets test-only values.
 
 **Usage:** results appear on each pull request. To block merging until they pass, add a branch protection rule for `main` under **Settings**, then **Branches**.
 

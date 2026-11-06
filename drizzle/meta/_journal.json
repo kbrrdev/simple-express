@@ -99,6 +99,13 @@
       "when": 1793946448816,
       "tag": "0013_remove_old_payment_method",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793949956350,
+      "tag": "0014_widen_order_amounts",
+      "breakpoints": true
     }
   ]
 }

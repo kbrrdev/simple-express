@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   index,
@@ -54,10 +55,10 @@ export const orders = pgTable(
     }),
     paymentStatus: paymentStatus('payment_status').notNull().default('unpaid'),
     paymentDueAt: timestamp('payment_due_at', { withTimezone: true }),
-    subtotalCents: integer('subtotal_cents').notNull(),
+    subtotalCents: bigint('subtotal_cents', { mode: 'number' }).notNull(),
     shippingCents: integer('shipping_cents').notNull(),
-    taxCents: integer('tax_cents').notNull(),
-    totalCents: integer('total_cents').notNull(),
+    taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),
+    totalCents: bigint('total_cents', { mode: 'number' }).notNull(),
     taxRateBasisPoints: integer('tax_rate_basis_points').notNull(),
     pricesIncludeTax: boolean('prices_include_tax').notNull(),
     recipientName: varchar('recipient_name', { length: 100 }).notNull(),
@@ -104,8 +105,8 @@ export const orderItems = pgTable(
     option2Value: varchar('option2_value', { length: 100 }),
     unitPriceCents: integer('unit_price_cents').notNull(),
     quantity: integer().notNull(),
-    taxCents: integer('tax_cents').notNull(),
-    lineTotalCents: integer('line_total_cents').notNull(),
+    taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),
+    lineTotalCents: bigint('line_total_cents', { mode: 'number' }).notNull(),
   },
   (table) => [index('order_items_order_id_idx').on(table.orderId)],
 );
@@ -117,7 +118,7 @@ export const payments = pgTable(
     orderId: uuid('order_id')
       .notNull()
       .references(() => orders.id, { onDelete: 'cascade' }),
-    amountCents: integer('amount_cents').notNull(),
+    amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
     // Enough for a future provider: its name, its reference, and its own raw status.
     provider: varchar({ length: 50 }).notNull(),
     reference: varchar({ length: 100 }).notNull(),

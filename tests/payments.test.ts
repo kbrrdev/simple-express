@@ -183,6 +183,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   env.PAYMENT_WINDOW_HOURS = 24;
+  env.MAX_OPEN_UNPAID_ORDERS = 1000;
 });
 
 afterAll(async () => {
@@ -702,9 +703,11 @@ describe('guest checkout', () => {
   });
 
   it('rejects more than the stock', async () => {
+    await db.update(productVariants).set({ stock: 2 });
+
     const response = await guestCheckout({
-      items: [{ variantId, quantity: 11 }],
-      expectedTotalCents: 112000 * 11 + 10000,
+      items: [{ variantId, quantity: 3 }],
+      expectedTotalCents: 112000 * 3 + 10000,
     }).expect(409);
 
     expect(response.body.error.message).toBe('Some items do not have enough stock');
@@ -774,6 +777,66 @@ describe('guest checkout', () => {
 
     await placeGuestOrder({ idempotencyKey, email: 'one@example.com' });
     await placeGuestOrder({ idempotencyKey, email: 'two@example.com' });
+
+    expect(await db.select().from(orders)).toHaveLength(2);
+  });
+
+  it('limits how much one order can hold', async () => {
+    await db.update(productVariants).set({ stock: 100 });
+
+    const response = await guestCheckout({
+      items: [{ variantId, quantity: 11 }],
+      expectedTotalCents: 112000 * 11 + 10000,
+    }).expect(400);
+
+    expect(response.body.error.details[0].message).toBe('A guest order can have up to 10 items');
+    await guestCheckout({
+      items: [{ variantId, quantity: 10 }],
+      expectedTotalCents: 112000 * 10 + 10000,
+    }).expect(201);
+  });
+
+  it('counts the whole order against the limit', async () => {
+    const [product] = await db.select().from(products);
+    const [second] = await db
+      .insert(productVariants)
+      .values({ productId: product?.id ?? '', option1Value: 'L', priceCents: 100, stock: 50 })
+      .returning();
+
+    await guestCheckout({
+      items: [
+        { variantId, quantity: 6 },
+        { variantId: second?.id, quantity: 5 },
+      ],
+    }).expect(400);
+  });
+
+  it('limits open unpaid orders per email', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 2;
+
+    await placeGuestOrder({ email: 'busy@example.com' });
+    await placeGuestOrder({ email: 'busy@example.com' });
+    await guestCheckout({ email: 'busy@example.com' }).expect(409);
+    await placeGuestOrder({ email: 'other@example.com' });
+  });
+
+  it('counts an order with a submitted reference as open', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 1;
+    const order = await placeGuestOrder({ email: 'busy@example.com' });
+    await api()
+      .post(`/api/orders/guest/${order.guestToken}/payment`)
+      .send({ reference: reference() })
+      .expect(200);
+
+    await guestCheckout({ email: 'busy@example.com' }).expect(409);
+  });
+
+  it('holds the limit with parallel requests', async () => {
+    env.MAX_OPEN_UNPAID_ORDERS = 2;
+
+    await Promise.all(
+      Array.from({ length: 8 }, () => guestCheckout({ email: 'busy@example.com' })),
+    );
 
     expect(await db.select().from(orders)).toHaveLength(2);
   });
@@ -879,6 +942,51 @@ describe('the private guest link', () => {
 
     await api().get(`/api/orders/${order.id}`).expect(401);
     await api().get(`/api/orders/${order.id}`).set(bearer(otherToken)).expect(404);
+  });
+});
+
+describe('the private link after an order finishes', () => {
+  const view = async (guestToken: string) =>
+    (await api().get(`/api/orders/guest/${guestToken}`).expect(200)).body.data;
+
+  it('shows the address while the order is open', async () => {
+    const order = await placeGuestOrder();
+
+    expect((await view(order.guestToken)).shippingAddress.city).toBe('Pasig');
+  });
+
+  it('hides the address once cancelled, but keeps the order', async () => {
+    const order = await placeGuestOrder();
+
+    await setStatus(order.id, 'cancelled').expect(200);
+
+    const viewed = await view(order.guestToken);
+
+    expect(viewed.shippingAddress).toBeNull();
+    expect(viewed.status).toBe('cancelled');
+    expect(viewed.items).toHaveLength(1);
+  });
+
+  it.each(['delivered', 'returned'])('hides the address once %s', async (finalStatus) => {
+    const order = await placeGuestOrder();
+    await api()
+      .post(`/api/orders/guest/${order.guestToken}/payment`)
+      .send({ reference: reference() })
+      .expect(200);
+    await adminPayment(order.id, 'confirm').expect(200);
+    await setStatus(order.id, 'confirmed').expect(200);
+    await setStatus(order.id, 'shipped').expect(200);
+    await setStatus(order.id, finalStatus).expect(200);
+
+    expect((await view(order.guestToken)).shippingAddress).toBeNull();
+  });
+
+  it('keeps the address for admins', async () => {
+    const order = await placeGuestOrder();
+
+    await setStatus(order.id, 'cancelled').expect(200);
+
+    expect((await getAdminOrder(order.id)).shippingAddress.city).toBe('Pasig');
   });
 });
 

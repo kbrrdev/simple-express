@@ -4,6 +4,9 @@ import { createAddressBody } from '../addresses/address.validation';
 import { cartItemsList, type CartItemInput } from '../cart/cart.validation';
 import type { Order, OrderStatus } from './order.schema';
 
+/** Guests pay nothing to place an order, so this limits how much stock each one can hold. */
+export const MAX_GUEST_ORDER_QUANTITY = 10;
+
 export interface ListOrdersQuery {
   page: number;
   limit: number;
@@ -72,7 +75,16 @@ export const createOrderBody = Joi.object<CreateOrderBody>({
 export const guestOrderBody = Joi.object<GuestOrderBody>({
   email: Joi.string().trim().lowercase().email({ tlds: false }).max(255).required(),
   address: createAddressBody.required(),
-  items: cartItemsList.min(1).required(),
+  items: cartItemsList
+    .min(1)
+    .required()
+    .custom((items: CartItemInput[], helpers) => {
+      const total = items.reduce((sum, item) => sum + item.quantity, 0);
+      return total > MAX_GUEST_ORDER_QUANTITY ? helpers.error('order.tooLarge') : items;
+    })
+    .messages({
+      'order.tooLarge': `A guest order can have up to ${MAX_GUEST_ORDER_QUANTITY} items`,
+    }),
   // Guests cannot pay by COD, as anonymous orders invite fake ones.
   paymentMethod: Joi.string().uuid().required(),
   expectedTotalCents: Joi.number().integer().min(0).required(),

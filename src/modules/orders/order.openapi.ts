@@ -140,7 +140,7 @@ export const orderPaths = {
       tags,
       summary: 'Check out as a guest',
       description:
-        'Guests cannot use COD. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.',
+        'Guests cannot use COD, and an order can have up to 10 items. Keep the returned `guestToken`, as it is the only way back to the order. Repeating a request with the same email and `idempotencyKey` returns the original order with 200.',
       requestBody: jsonBody('CreateGuestOrder'),
       responses: {
         200: { description: 'The original order', content: dataContent('GuestOrder') },
@@ -478,6 +478,11 @@ export const orderSchemas = {
     required: [...orderRequired, 'guestToken'],
     properties: {
       ...orderProperties,
+      shippingAddress: {
+        ...orderProperties.shippingAddress,
+        type: ['object', 'null'],
+        description: 'Hidden once the order is delivered, returned, or cancelled',
+      },
       guestToken: { type: 'string', description: 'Opens this order. Keep it private.' },
     },
   },

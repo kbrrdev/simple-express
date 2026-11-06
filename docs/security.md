@@ -6,19 +6,27 @@ The tools used to find problems are described in [security-tools.md](security-to
 
 ## Status
 
-| #   | Gap                                   | Severity      | Status             |
-| --- | ------------------------------------- | ------------- | ------------------ |
-| 1   | `trust proxy` not configured          | High          | Fixed              |
-| 2   | API connected as a database superuser | High          | Fixed              |
-| 3   | Swagger public in production          | Low to Medium | Fixed              |
-| 4   | No way to change a password           | High          | Fixed              |
-| 5   | No password reset                     | High          | Open, needs email  |
-| 6   | Rate limits were IP-only              | Medium        | Fixed, with a note |
-| 7   | No security headers                   | Medium        | Fixed              |
-| 8   | Weak passwords allowed                | Medium        | Fixed              |
-| 9   | Stolen-token detection was shallow    | Medium        | Fixed              |
-| 10  | No email verification                 | Medium        | Later, needs email |
-| 11  | Registration reveals existing emails  | Low           | Later, needs email |
+| #   | Gap                                    | Severity      | Status             |
+| --- | -------------------------------------- | ------------- | ------------------ |
+| 1   | `trust proxy` not configured           | High          | Fixed              |
+| 2   | API connected as a database superuser  | High          | Fixed              |
+| 3   | Swagger public in production           | Low to Medium | Fixed              |
+| 4   | No way to change a password            | High          | Fixed              |
+| 5   | No password reset                      | High          | Open, needs email  |
+| 6   | Rate limits were IP-only               | Medium        | Fixed, with a note |
+| 7   | No security headers                    | Medium        | Fixed              |
+| 8   | Weak passwords allowed                 | Medium        | Fixed              |
+| 9   | Stolen-token detection was shallow     | Medium        | Fixed              |
+| 10  | No email verification                  | Medium        | Later, needs email |
+| 11  | Registration reveals existing emails   | Low           | Later, needs email |
+| 12  | Database published with a weak default | Critical      | Fixed              |
+| 13  | Stock could be held for free           | High          | Fixed, with a note |
+| 14  | Secrets in error logs                  | High          | Fixed              |
+| 15  | Draft blogs were public                | Medium        | Fixed              |
+| 16  | Admin login has no second factor       | High          | Open               |
+| 17  | Guest links never expire               | Medium        | Fixed, with a note |
+| 18  | No automatic checks on GitHub          | Medium        | Fixed, with a note |
+| 19  | Large order totals failed              | Low           | Fixed              |
 
 ## Fixed
 
@@ -79,7 +87,51 @@ Only the most recent old refresh token used to be remembered. Each token now hol
 - The token just replaced is still accepted for 30 seconds, for retries and parallel tabs. A token stolen and used inside that window can still work.
 - Sessions created before this change must log in again.
 
+### 12. Database published with a weak default
+
+PostgreSQL was published on all network addresses, with a default password of `postgres`, and Docker can bypass firewall rules. It is now bound to `127.0.0.1`, and `POSTGRES_PASSWORD` is required.
+
+### 13. Stock could be held for free
+
+A guest could reserve large quantities without paying, then submit a fake reference so the order never expired.
+
+- One customer or guest email can have `MAX_OPEN_UNPAID_ORDERS` unpaid orders open, 5 by default.
+- A guest order can have up to 10 items.
+- Guest checkout is limited to 10 requests per hour per IP address.
+
+**Remaining limitation:** someone with many IP addresses and email addresses can still hold stock, and orders with a submitted reference wait for an admin. Review `GET /api/orders/admin?paymentStatus=submitted` often.
+
+### 14. Secrets in error logs
+
+Failed queries logged their values, including password hashes and emails. `toSafeLog` now logs the query text and the kind of failure only.
+
+### 15. Draft blogs were public
+
+Unpublished blogs could be read through the list and by ID. Public routes now return published blogs only, and admins read drafts through `/api/blogs/admin`.
+
+### 17. Guest links never expire
+
+Finished orders now hide the shipping address from their link, so an old link stops exposing it. An open order still shows it, as the guest needs it.
+
+**Remaining limitation:** links still show the order itself, and do not expire.
+
+### 18. No automatic checks on GitHub
+
+`.github/workflows/ci.yml` runs on pull requests, and `.github/dependabot.yml` checks dependencies weekly.
+
+**Remaining step:** CodeQL, secret scanning, and push protection are turned on in the repository's settings, as described in [security-tools.md](security-tools.md).
+
+### 19. Large order totals failed
+
+Order amounts now use `bigint`, as a total above about 21 million pesos overflowed a 32-bit integer.
+
 ## Open
+
+### 16. Admin login has no second factor
+
+**Risk:** a stolen admin password gives full control of products, orders, and customer data.
+
+**Plan:** add two-factor login for admins. Until then, use a long, unique password, and only make admins who need it.
 
 ### 5. No password reset
 
@@ -118,5 +170,7 @@ These need an email service. Use Mailpit in development and a real provider in p
 
 - **Guest orders:** guests cannot use COD, as anonymous orders invite fake ones. Guest checkout has its own rate limit per IP address.
 - **Guest order links:** the link is the only access to a guest order, so it is sent with `Cache-Control: no-store`. Changing `JWT_SECRET` invalidates all of them.
+- **Manual payments:** always confirm a payment in the GCash or bank app itself, never from a reference or screenshot alone.
+- **Traffic floods:** these are handled in front of the API, such as by a free Cloudflare plan, not in the API.
 
 - **Row Level Security:** not used. The API is the only client of the database, and queries are scoped to the user in the service layer. Reconsider it if anything else connects directly.

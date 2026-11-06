@@ -27,6 +27,7 @@ export default defineConfig({
       PRICES_INCLUDE_TAX: 'true',
       SHIPPING_FEE_CENTS: '10000',
       PAYMENT_WINDOW_HOURS: '24',
+      MAX_OPEN_UNPAID_ORDERS: '1000',
       UPLOADS_DIR: join(tmpdir(), 'simple-express-test-uploads'),
       S3_BUCKET: '',
       S3_REGION: '',

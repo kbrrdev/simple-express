@@ -38,7 +38,7 @@ Set `JWT_SECRET` to a random value of at least 32 characters. The API will not s
 node -p "require('crypto').randomBytes(32).toString('hex')"
 ```
 
-Set `APP_DB_PASSWORD` to a random value too, using only URL-safe characters. The API connects as this limited role, which can read and write rows but not change the schema. When running on your host, also put it in `DATABASE_URL`.
+Set `POSTGRES_PASSWORD` and `APP_DB_PASSWORD` to random values too, using only URL-safe characters. Docker will not start without them. The API connects as this limited role, which can read and write rows but not change the schema. When running on your host, also put it in `DATABASE_URL`.
 
 Update the other environment variables as needed. If the API runs behind a proxy, set `TRUST_PROXY_HOPS` to the number of proxies.
 
@@ -299,7 +299,7 @@ In the production container, run `docker compose exec api node dist/db/make-admi
 
 ## Blogs
 
-Blogs are public to read. Only admins can create, update, and delete them.
+Published blogs are public to read, and drafts are hidden from the public, including by direct link. Only admins can create, update, and delete blogs, and they can read drafts through `GET /api/blogs/admin` and `GET /api/blogs/admin/:id`.
 
 ## Products
 
@@ -452,7 +452,15 @@ Orders copy the account they were placed with, so a customer keeps seeing the ac
 
 Guests send their email, address, and items to `POST /api/orders/guest`, using the same preview flow. The response includes a `guestToken`, which is the only way back to the order, so show it as a private link. It cannot be recovered later, until emails can carry it.
 
-Guest orders are never linked to an account, even if the email matches one, as emails are not verified. Responses do not reveal whether an email is registered.
+Links do not expire, so a finished order stops showing the shipping address. Guest orders are never linked to an account, even if the email matches one, as emails are not verified. Responses do not reveal whether an email is registered.
+
+### Limits
+
+Unpaid orders hold stock for free, so:
+
+- One customer or guest email can have `MAX_OPEN_UNPAID_ORDERS` unpaid orders open, 5 by default.
+- A guest order can have up to 10 items.
+- Guest checkout is limited to 10 requests per hour per IP address.
 
 ### Adding a Payment Provider
 

@@ -52,6 +52,8 @@ const adminTransitions: Partial<Record<OrderStatus, OrderStatus[]>> = {
   shipped: ['delivered', 'returned'],
 };
 
+const FINISHED_STATUSES: OrderStatus[] = ['delivered', 'returned', 'cancelled'];
+
 const adminOrderFields = {
   ...getTableColumns(orders),
   customerEmail: users.email,
@@ -245,36 +247,26 @@ export async function createOrder(userId: string, body: CreateOrderBody) {
 
 /** Guests have no cart or saved address, so the request carries both. */
 export async function createGuestOrder(body: GuestOrderBody) {
-  try {
-    return await db.transaction(async (tx) => {
-      const [existing] = await tx.select().from(orders).where(guestOrderKey(body));
+  return db.transaction(async (tx) => {
+    // One checkout per email at a time, as guests have no user row to lock.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${body.email}))`);
 
-      if (existing) return { order: await toGuestOrder(tx, existing), created: false };
+    const [existing] = await tx.select().from(orders).where(guestOrderKey(body));
 
-      const items = await findGuestItems(tx, body.items);
-      const order = await placeOrder(tx, {
-        ...body,
-        owner: { guestEmail: body.email },
-        items,
-      });
+    if (existing) return { order: await toGuestOrder(tx, existing), created: false };
 
-      return { order: await toGuestOrder(tx, order), created: true };
-    });
-  } catch (error) {
-    // Two parallel retries with one key: the loser returns the order the winner made.
-    if (!hasDbErrorCode(error, UNIQUE_VIOLATION)) throw error;
+    const items = await findGuestItems(tx, body.items);
+    const order = await placeOrder(tx, { ...body, owner: { guestEmail: body.email }, items });
 
-    const [existing] = await db.select().from(orders).where(guestOrderKey(body));
-
-    if (!existing) throw error;
-
-    return { order: await toGuestOrder(db, existing), created: false };
-  }
+    return { order: await toGuestOrder(tx, order), created: true };
+  });
 }
 
 async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   const { owner, address, items, paymentMethod, expectedTotalCents, idempotencyKey } = input;
   const method = await findPaymentMethod(tx, paymentMethod);
+
+  await assertOrderLimit(tx, owner);
 
   const unavailable = items.filter((item) => !item.variantActive || !item.productActive);
 
@@ -344,6 +336,26 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   );
 
   return order;
+}
+
+/** Unpaid orders hold stock for free, so one customer cannot be allowed too many at once. */
+async function assertOrderLimit(tx: Transaction, owner: PlaceOrderInput['owner']) {
+  const [open] = await tx
+    .select({ total: count() })
+    .from(orders)
+    .where(
+      and(
+        'userId' in owner
+          ? eq(orders.userId, owner.userId)
+          : eq(orders.guestEmail, owner.guestEmail),
+        inArray(orders.status, ['awaiting_payment', 'pending']),
+        inArray(orders.paymentStatus, ['unpaid', 'submitted']),
+      ),
+    );
+
+  if ((open?.total ?? 0) >= env.MAX_OPEN_UNPAID_ORDERS) {
+    throw new AppError(409, 'Pay or cancel your open orders before placing another');
+  }
 }
 
 async function findPaymentMethod(tx: Transaction, paymentMethod: string) {
@@ -765,9 +777,13 @@ function toAdminOrder(
   };
 }
 
+/** Links never expire, so a finished order stops showing the guest's address. */
 async function toGuestOrder(database: Database, order: Order) {
+  const publicOrder = toPublicOrder(order, await findDetails(database, [order]));
+
   return {
-    ...toPublicOrder(order, await findDetails(database, [order])),
+    ...publicOrder,
+    shippingAddress: FINISHED_STATUSES.includes(order.status) ? null : publicOrder.shippingAddress,
     guestToken: `${order.id}.${signGuestOrder(order.id)}`,
   };
 }

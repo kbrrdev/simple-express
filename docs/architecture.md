@@ -134,7 +134,7 @@ Central route registration. Module routes are mounted under `/api`.
 
 ## Blogs
 
-Blogs are public to read. Only admins can create, update, and delete them.
+Published blogs are public to read, and drafts are hidden, including by direct link. Only admins can write blogs or read drafts.
 
 ## Products
 
@@ -168,11 +168,13 @@ Blogs are public to read. Only admins can create, update, and delete them.
 - Checkout runs in one transaction. It locks the user, handles repeated `idempotencyKey` values, reads prices from the database, compares the total with `expectedTotalCents`, reduces stock with a conditional update in variant order, then saves the order and empties the cart.
 - Queries inside the transaction use its connection, so that a burst of checkouts cannot exhaust the pool.
 - Status changes lock the order row, so that stock is only returned once. `adminTransitions` in `order.service.ts` lists the allowed moves.
+- Unpaid orders hold stock for free. `MAX_OPEN_UNPAID_ORDERS` limits them per customer or guest email, and guest orders are limited to 10 items. Guest checkout takes an advisory lock on the email, so that parallel requests cannot pass the limit or create duplicates.
+- Order amounts are `bigint`, as a total can pass the 32-bit limit.
 - `markPaid` is the only way an order becomes paid, and is safe to repeat, so a future webhook can use it. `calculateShipping` is the only place that sets the fee.
 - Manual orders start as `awaiting_payment`, and a row in `payments` records the reference. The unique provider and reference stop a payment being counted twice.
 - Orders copy the provider, account name, account number, and QR of the `payment_methods` row they were placed with. The QR has a foreign key, so a file an unpaid order still shows cannot be deleted.
 - `expireUnpaidOrders` runs every 5 minutes from `index.ts`. It uses `FOR UPDATE SKIP LOCKED`, so several servers can run it safely, and it skips orders with a submitted reference.
-- Guest orders have a `guest_email` and no `user_id`, and are never linked to accounts. Their `guestToken` is the order ID with an HMAC signature, so a retry can return the same link without storing it. Changing `JWT_SECRET` invalidates these links.
+- Guest orders have a `guest_email` and no `user_id`, and are never linked to accounts. Their links do not expire, so finished orders hide the shipping address. Their `guestToken` is the order ID with an HMAC signature, so a retry can return the same link without storing it. Changing `JWT_SECRET` invalidates these links.
 - Tax is calculated per line and on shipping. `TAX_RATE_PERCENT` and `PRICES_INCLUDE_TAX` set it, and both are saved on each order.
 
 ## Addresses
@@ -212,7 +214,7 @@ The `validate` middleware checks request bodies, parameters, and query strings a
 
 ## Error Handling
 
-All application errors are handled through centralized error-handling middleware. Expected errors use `AppError`, and unexpected errors return a generic `500` response without internal details.
+All application errors are handled through centralized error-handling middleware. Expected errors use `AppError`, and unexpected errors return a generic `500` response without internal details. `toSafeLog` keeps query values out of the logs, as they can include password hashes and personal data.
 
 ## Configuration
 
@@ -226,5 +228,5 @@ API tests live in `tests/` and run with Vitest and Supertest against a disposabl
 
 - `docker-compose.yml` runs the production image and PostgreSQL, and keeps uploads in the `uploads-data` volume.
 - `docker-compose.dev.yml` adds the development image, live reload, and Adminer, used by `npm run docker:watch`.
-- PostgreSQL is published on host port `5433` by default.
+- PostgreSQL is published on `127.0.0.1:5433` by default, so only the host can reach it. `POSTGRES_PASSWORD` is required.
 - The `db-test` service runs only with the `test` profile.

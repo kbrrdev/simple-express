@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
+import type { Request, Response } from 'express';
 import request from 'supertest';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../src/app';
-import { pool } from '../src/db';
+import { db, pool } from '../src/db';
+import { users } from '../src/db/schema';
 import { openApiDocument } from '../src/docs/openapi';
 import { buildPostmanCollection } from '../src/docs/postman';
+import { toSafeLog } from '../src/lib/db-errors';
+import { errorHandler } from '../src/middleware/error-handler';
 
 const login = (ip: string) =>
   request(app).post('/api/auth/login').set('X-Forwarded-For', ip).send({});
@@ -53,6 +57,52 @@ describe('client IP address', () => {
 
     expect(fresh.app.get('trust proxy')).toBe(2);
     await db.pool.end();
+  });
+});
+
+describe('error logs', () => {
+  const failedInsert = async () => {
+    try {
+      await db.insert(users).values({
+        email: 'secret-person@example.com',
+        passwordHash: 'SECRET-HASH-VALUE',
+        role: 'nope' as 'admin',
+      });
+    } catch (error) {
+      return error;
+    }
+
+    throw new Error('Expected the insert to fail');
+  };
+
+  it('keep query values out of unexpected errors', async () => {
+    const error = await failedInsert();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const json = vi.fn();
+    const res = { status: vi.fn(() => ({ json })) } as unknown as Response;
+
+    errorHandler(error, {} as Request, res, vi.fn());
+
+    const logged = JSON.stringify(log.mock.calls);
+    log.mockRestore();
+
+    expect(logged).toContain('insert into');
+    expect(logged).not.toContain('SECRET-HASH-VALUE');
+    expect(logged).not.toContain('secret-person@example.com');
+    expect(json).toHaveBeenCalledWith({ error: { message: 'Internal server error' } });
+  });
+
+  it('keep the kind of failure, for debugging', async () => {
+    expect(toSafeLog(await failedInsert())).toMatchObject({
+      message: 'Database query failed',
+      code: '22P02',
+    });
+  });
+
+  it('leave other errors unchanged', () => {
+    const error = new Error('Something else');
+
+    expect(toSafeLog(error)).toBe(error);
   });
 });
 
