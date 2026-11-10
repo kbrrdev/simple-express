@@ -111,6 +111,22 @@ export const productPaths = {
       },
     },
   },
+  '/api/products/admin/{id}': {
+    get: {
+      tags,
+      summary: 'Get any product, including inactive ones and their variants (admin)',
+      security,
+      parameters: [productId],
+      responses: {
+        200: { description: 'The product', content: dataContent('Product') },
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        404: notFound,
+        500: serverError,
+      },
+    },
+  },
   '/api/products/{id}': {
     get: {
       tags,

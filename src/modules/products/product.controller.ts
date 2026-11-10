@@ -33,6 +33,10 @@ export async function get(req: Request<IdParams>, res: Response) {
   res.json({ data: await productService.getProduct(req.params.id) });
 }
 
+export async function getForAdmin(req: Request<IdParams>, res: Response) {
+  res.json({ data: await productService.getProduct(req.params.id, true) });
+}
+
 export async function create(req: Request<object, object, CreateProductBody>, res: Response) {
   const product = await productService.createProduct(req.body);
   res.status(201).location(`${req.baseUrl}/${product.id}`).json({ data: product });

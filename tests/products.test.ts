@@ -350,6 +350,34 @@ describe('the admin product list', () => {
   });
 });
 
+describe('getting a product as an admin', () => {
+  it('only allows admins', async () => {
+    const product = await createProduct(shirt());
+    const url = `/api/products/admin/${product.id}`;
+
+    await api().get(url).expect(401);
+    await api().get(url).set(bearer(customerToken)).expect(403);
+  });
+
+  it('returns inactive products and variants', async () => {
+    const product = await createProduct(shirt());
+
+    await asAdmin.delete(`/api/products/${product.id}/variants/${product.variants[0].id}`);
+    await asAdmin.delete(`/api/products/${product.id}`).expect(204);
+
+    const response = await asAdmin.get(`/api/products/admin/${product.id}`).expect(200);
+
+    expect(response.body.data.active).toBe(false);
+    expect(response.body.data.variants).toHaveLength(2);
+    expect(response.body.data.variants[0].active).toBe(false);
+  });
+
+  it('returns 404 for an unknown product and 400 for an invalid id', async () => {
+    await asAdmin.get('/api/products/admin/00000000-0000-4000-8000-000000000000').expect(404);
+    await asAdmin.get('/api/products/admin/nope').expect(400);
+  });
+});
+
 describe('updating products', () => {
   it('only lets admins write', async () => {
     const product = await createProduct(shirt());

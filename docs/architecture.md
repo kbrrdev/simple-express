@@ -145,6 +145,7 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Option values must match the product's options, and each combination is unique within a product. Options can be renamed, but not added or removed after creation.
 - Products and variants are deactivated instead of deleted, so that future orders can keep referencing them.
 - Public routes only return active products that have an active variant, and only their active variants.
+- Admin routes, `/api/products/admin` and `/api/products/admin/:id`, return every product and variant, so that inactive ones can be edited and turned back on.
 
 ## Cart
 

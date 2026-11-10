@@ -79,15 +79,18 @@ export async function listProducts(
   };
 }
 
-export async function getProduct(id: string) {
+export async function getProduct(id: string, includeInactive = false) {
   const [product] = await db
     .select()
     .from(products)
-    .where(and(eq(products.id, id), isPublic));
+    .where(and(eq(products.id, id), includeInactive ? undefined : isPublic));
 
   if (!product) notFound(id);
 
-  const [variants, images] = await Promise.all([findVariants([id], false), findImages([id])]);
+  const [variants, images] = await Promise.all([
+    findVariants([id], includeInactive),
+    findImages([id]),
+  ]);
 
   return { ...product, images, variants };
 }
