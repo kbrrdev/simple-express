@@ -33,6 +33,13 @@ productRoutes.get(
   validate('query', listProductsQuery),
   controller.listForAdmin,
 );
+productRoutes.get(
+  '/admin/:id',
+  requireAuth,
+  requireAdmin,
+  validate('params', productParams),
+  controller.getForAdmin,
+);
 productRoutes.get('/:id', validate('params', productParams), controller.get);
 productRoutes.patch(
   '/:id',

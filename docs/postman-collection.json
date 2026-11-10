@@ -863,6 +863,32 @@
           }
         },
         {
+          "name": "Get any product, including inactive ones and their variants (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/admin/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "admin",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{productId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Get a product on sale",
           "request": {
             "method": "GET",
