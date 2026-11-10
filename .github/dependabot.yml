@@ -4,10 +4,20 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Upgraded on purpose, together with the Dockerfile and CI.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Stay on Node.js long-term support releases.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:

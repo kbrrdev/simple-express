@@ -180,3 +180,20 @@ Email is set up with `sendEmail` in `src/lib/email.ts`, Mailpit in development, 
 - **Traffic floods:** these are handled in front of the API, such as by a free Cloudflare plan, not in the API.
 
 - **Row Level Security:** not used. The API is the only client of the database, and queries are scoped to the user in the service layer. Reconsider it if anything else connects directly.
+
+## Dependency Advisories
+
+CI fails on high or critical advisories in production packages, with `npm audit --omit=dev --audit-level=high`.
+
+| Severity      | Production package       | Development tool only           |
+| ------------- | ------------------------ | ------------------------------- |
+| Critical      | Fix within a day         | Fix within a week               |
+| High          | Fix within a week        | Fix with the next update        |
+| Moderate, Low | Fix with the next update | Wait for the tool's own release |
+
+Known development-only advisories:
+
+- **esbuild** [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99), through `drizzle-kit`. It affects esbuild's development server, which this project never starts.
+- **minimatch** [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), through ESLint and `typescript-eslint`. It needs untrusted glob patterns, and lint only reads this repository's own.
+
+Neither reaches the production image, which installs production packages only. Never run `npm audit fix --force` for these, as it downgrades ESLint and `drizzle-kit` to older major versions.
