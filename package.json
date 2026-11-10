@@ -21,6 +21,7 @@
     "db:studio": "drizzle-kit studio",
     "db:make-admin": "tsx src/db/make-admin.ts",
     "postman": "tsx src/docs/generate-postman.ts",
+    "email:test": "tsx src/lib/send-test-email.ts",
     "docker:watch": "docker compose -f docker-compose.yml -f docker-compose.dev.yml watch",
     "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
     "test": "vitest run",
@@ -39,6 +40,7 @@
     "joi": "^18.3.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.5.0",
+    "nodemailer": "^10.3.1",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "swagger-ui-express": "^5.0.1"
@@ -51,6 +53,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.3.0",
     "@types/node": "^24.19.2",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "@types/swagger-ui-express": "^4.1.8",

@@ -204,6 +204,13 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - A client disconnecting fires the `close` event outside the request, so that listener is bound with `AsyncLocalStorage.bind`.
 - Expected errors are logged as `warn`, without their details, and unexpected ones as `error`.
 
+## Email
+
+- `src/lib/email.ts` sends email with Nodemailer over SMTP, so changing provider only changes `.env`. It holds the only connection to the mail server.
+- Development uses Mailpit, which delivers nothing.
+- Logging in to a mail server requires an encrypted connection.
+- Recipients and content stay out of the logs, as they can hold personal data and private links.
+
 ## Validation
 
 The `validate` middleware checks request bodies, parameters, and query strings against Joi schemas. Unknown fields are rejected.
@@ -238,6 +245,6 @@ API tests live in `tests/` and run with Vitest and Supertest against a disposabl
 ## Docker
 
 - `docker-compose.yml` runs the production image and PostgreSQL, and keeps uploads in the `uploads-data` volume.
-- `docker-compose.dev.yml` adds the development image, live reload, and Adminer, used by `npm run docker:watch`.
+- `docker-compose.dev.yml` adds the development image, live reload, Adminer, and Mailpit, used by `npm run docker:watch`.
 - The API and PostgreSQL are published on `127.0.0.1` only, so that a proxy such as Caddy is the only way in. `POSTGRES_PASSWORD` is required.
 - The `db-test` service runs only with the `test` profile.
