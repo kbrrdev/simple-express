@@ -2,7 +2,7 @@
 
 A simple and maintainable backend boilerplate built with **Express 5, TypeScript, Drizzle ORM, PostgreSQL, Joi, and Docker**.
 
-Includes a sample Blogs CRUD API to demonstrate the project's structure and development patterns.
+It runs a complete store API: accounts, products and variants, carts, guest and customer checkout, manual payments, addresses, uploads, and blogs.
 
 ## Tech Stack
 
@@ -14,6 +14,9 @@ Includes a sample Blogs CRUD API to demonstrate the project's structure and deve
 - **Validation:** Joi
 - **API Documentation:** Swagger / OpenAPI
 - **Containerization:** Docker and Docker Compose
+- **Logging:** Pino
+- **Email:** Nodemailer, with Mailpit in development
+- **Testing:** Vitest and Supertest
 - **Code Quality:** ESLint and Prettier
 
 ## Getting Started
@@ -80,26 +83,26 @@ To use another port, update `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
 
 ## Available Scripts
 
-| Script | Description |
-|---|---|
-| `npm run dev` | Start development server with automatic reload |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm start` | Run the compiled application |
-| `npm run typecheck` | Type-check without emitting files |
-| `npm run lint` | Run ESLint |
-| `npm run lint:fix` | Automatically fix ESLint issues |
-| `npm run format` | Format code with Prettier |
-| `npm run format:check` | Check code formatting |
-| `npm run db:generate` | Generate migrations from schema changes |
-| `npm run db:migrate` | Apply pending migrations |
-| `npm run db:studio` | Open Drizzle Studio |
-| `npm run db:make-admin -- <email>` | Make an existing user an admin |
-| `npm run postman` | Regenerate the Postman collection |
-| `npm run email:test -- <email>` | Send a test email |
-| `npm run docker:watch` | Run Docker development environment with live reload |
-| `npm run docker:down` | Stop Docker development containers |
-| `npm run test:db` | Start the disposable test database |
-| `npm test` | Start the test database and run the test suite |
+| Script                             | Description                                         |
+| ---------------------------------- | --------------------------------------------------- |
+| `npm run dev`                      | Start development server with automatic reload      |
+| `npm run build`                    | Compile TypeScript to `dist/`                       |
+| `npm start`                        | Run the compiled application                        |
+| `npm run typecheck`                | Type-check without emitting files                   |
+| `npm run lint`                     | Run ESLint                                          |
+| `npm run lint:fix`                 | Automatically fix ESLint issues                     |
+| `npm run format`                   | Format code with Prettier                           |
+| `npm run format:check`             | Check code formatting                               |
+| `npm run db:generate`              | Generate migrations from schema changes             |
+| `npm run db:migrate`               | Apply pending migrations                            |
+| `npm run db:studio`                | Open Drizzle Studio                                 |
+| `npm run db:make-admin -- <email>` | Make an existing user an admin                      |
+| `npm run postman`                  | Regenerate the Postman collection                   |
+| `npm run email:test -- <email>`    | Send a test email                                   |
+| `npm run docker:watch`             | Run Docker development environment with live reload |
+| `npm run docker:down`              | Stop Docker development containers                  |
+| `npm run test:db`                  | Start the disposable test database                  |
+| `npm test`                         | Start the test database and run the test suite      |
 
 ## API Documentation
 
@@ -144,25 +147,28 @@ src/
     ├── payment-methods/
     └── products/
 
+docs/
 drizzle/
 tests/
 AGENTS.md
+CLAUDE.md
 README.md
 ```
 
 ### Directory Responsibilities
 
-| Directory | Responsibility |
-|---|---|
-| `config/` | Application configuration and environment validation |
-| `db/` | Database connection, schemas, and migration runner |
-| `docs/` | Shared OpenAPI definitions served by Swagger UI |
-| `lib/` | Shared application utilities and error classes |
-| `middleware/` | Express middleware |
-| `routes/` | Central route registration |
-| `modules/` | Feature-based application modules |
-| `drizzle/` | Generated SQL migrations |
-| `tests/` | API tests |
+| Directory     | Responsibility                                                 |
+| ------------- | -------------------------------------------------------------- |
+| `config/`     | Application configuration and environment validation           |
+| `db/`         | Database connection, schemas, and migration runner             |
+| `src/docs/`   | Shared OpenAPI definitions served by Swagger UI                |
+| `docs/`       | Architecture, deployment, security, and the Postman collection |
+| `lib/`        | Shared application utilities and error classes                 |
+| `middleware/` | Express middleware                                             |
+| `routes/`     | Central route registration                                     |
+| `modules/`    | Feature-based application modules                              |
+| `drizzle/`    | Generated SQL migrations                                       |
+| `tests/`      | API tests                                                      |
 
 ## Architecture
 
@@ -170,35 +176,7 @@ The project follows a simple feature-based modular structure.
 
 Each feature keeps its routes, controllers, services, and validation schemas together when needed.
 
-### Request Flow
-
-```text
-Client
-  |
-  v
-Express Middleware
-  |
-  v
-Routes
-  |
-  v
-Request Validation
-  |
-  v
-Controller
-  |
-  v
-Service
-  |
-  v
-Drizzle ORM
-  |
-  v
-PostgreSQL
-  |
-  v
-Response
-```
+See [docs/architecture.md](docs/architecture.md) for the request lifecycle and how each feature works.
 
 ## Adding a New Module
 
@@ -238,13 +216,13 @@ The command runs on your host and connects using `DATABASE_URL` from `.env`. The
 
 **Adminer** starts with `npm run docker:watch` at <http://localhost:8081>. Log in with:
 
-| Field | Value |
-|---|---|
-| System | PostgreSQL |
-| Server | `db` |
-| Username | `POSTGRES_USER` from `.env` |
+| Field    | Value                           |
+| -------- | ------------------------------- |
+| System   | PostgreSQL                      |
+| Server   | `db`                            |
+| Username | `POSTGRES_USER` from `.env`     |
 | Password | `POSTGRES_PASSWORD` from `.env` |
-| Database | `POSTGRES_DB` from `.env` |
+| Database | `POSTGRES_DB` from `.env`       |
 
 Adminer only runs in the development stack, and only your own machine can reach it. To run SQL directly, use its **SQL command** page.
 
@@ -279,15 +257,15 @@ Clients log in with an email and password and receive two tokens:
 - **Access token:** a JWT valid for 15 minutes, sent as `Authorization: Bearer <token>`.
 - **Refresh token:** a random token valid for 30 days, used to get new tokens. Each one works once, so store the new one after every refresh.
 
-| Endpoint | Description | Requires access token |
-|---|---|---|
-| `POST /api/auth/register` | Create a user | No |
-| `POST /api/auth/login` | Start a session | No |
-| `POST /api/auth/refresh` | Get new tokens | No |
-| `POST /api/auth/change-password` | Change the password, ending other sessions | Yes |
-| `POST /api/auth/logout` | End the current session | Yes |
-| `POST /api/auth/logout-all` | End all sessions for the user | Yes |
-| `GET /api/auth/me` | Get the current user | Yes |
+| Endpoint                         | Description                                | Requires access token |
+| -------------------------------- | ------------------------------------------ | --------------------- |
+| `POST /api/auth/register`        | Create a user                              | No                    |
+| `POST /api/auth/login`           | Start a session                            | No                    |
+| `POST /api/auth/refresh`         | Get new tokens                             | No                    |
+| `POST /api/auth/change-password` | Change the password, ending other sessions | Yes                   |
+| `POST /api/auth/logout`          | End the current session                    | Yes                   |
+| `POST /api/auth/logout-all`      | End all sessions for the user              | Yes                   |
+| `GET /api/auth/me`               | Get the current user                       | Yes                   |
 
 Login requires a `client` value:
 
@@ -333,22 +311,23 @@ Each product belongs to one category and can have up to two options, which you n
 
 A product with no options still has one variant, without any option values. Prices are in cents.
 
-| Endpoint | Description | Access |
-|---|---|---|
-| `GET /api/categories` | List categories | Public |
-| `GET /api/categories/:id` | Get a category | Public |
-| `POST /api/categories` | Create a category | Admin |
-| `PATCH /api/categories/:id` | Rename a category | Admin |
-| `DELETE /api/categories/:id` | Delete a category with no products | Admin |
-| `GET /api/products` | List products on sale | Public |
-| `GET /api/products/:id` | Get a product on sale | Public |
-| `GET /api/products/admin` | List all products, including inactive ones | Admin |
-| `POST /api/products` | Create a product and its variants | Admin |
-| `PATCH /api/products/:id` | Update a product | Admin |
-| `DELETE /api/products/:id` | Deactivate a product | Admin |
-| `POST /api/products/:id/variants` | Add a variant | Admin |
-| `PATCH /api/products/:id/variants/:variantId` | Update a variant | Admin |
-| `DELETE /api/products/:id/variants/:variantId` | Deactivate a variant | Admin |
+| Endpoint                                       | Description                                  | Access |
+| ---------------------------------------------- | -------------------------------------------- | ------ |
+| `GET /api/categories`                          | List categories                              | Public |
+| `GET /api/categories/:id`                      | Get a category                               | Public |
+| `POST /api/categories`                         | Create a category                            | Admin  |
+| `PATCH /api/categories/:id`                    | Rename a category                            | Admin  |
+| `DELETE /api/categories/:id`                   | Delete a category with no products           | Admin  |
+| `GET /api/products`                            | List products on sale                        | Public |
+| `GET /api/products/:id`                        | Get a product on sale                        | Public |
+| `GET /api/products/admin`                      | List all products, including inactive ones   | Admin  |
+| `GET /api/products/admin/:id`                  | Get any product, including inactive variants | Admin  |
+| `POST /api/products`                           | Create a product and its variants            | Admin  |
+| `PATCH /api/products/:id`                      | Update a product                             | Admin  |
+| `DELETE /api/products/:id`                     | Deactivate a product                         | Admin  |
+| `POST /api/products/:id/variants`              | Add a variant                                | Admin  |
+| `PATCH /api/products/:id/variants/:variantId`  | Update a variant                             | Admin  |
+| `DELETE /api/products/:id/variants/:variantId` | Deactivate a variant                         | Admin  |
 
 Product lists support `page`, `limit`, `search`, `categoryId`, and `sort` (`newest` or `name`).
 
@@ -358,15 +337,15 @@ To restore a deactivated product or variant, set `active` to `true` with `PATCH`
 
 Each logged-in user has one cart, which follows them across devices. Prices are read from the variants each time, so a cart always shows current prices.
 
-| Endpoint | Description | Requires access token |
-|---|---|---|
-| `GET /api/cart` | Get the cart | Yes |
-| `DELETE /api/cart` | Empty the cart | Yes |
-| `POST /api/cart/items` | Add a variant, combining with any existing quantity | Yes |
-| `PATCH /api/cart/items/:variantId` | Set the quantity of an item | Yes |
-| `DELETE /api/cart/items/:variantId` | Remove an item | Yes |
-| `POST /api/cart/preview` | Price a guest cart without saving it | No |
-| `POST /api/cart/merge` | Move a guest cart into the user's cart | Yes |
+| Endpoint                            | Description                                         | Requires access token |
+| ----------------------------------- | --------------------------------------------------- | --------------------- |
+| `GET /api/cart`                     | Get the cart                                        | Yes                   |
+| `DELETE /api/cart`                  | Empty the cart                                      | Yes                   |
+| `POST /api/cart/items`              | Add a variant, combining with any existing quantity | Yes                   |
+| `PATCH /api/cart/items/:variantId`  | Set the quantity of an item                         | Yes                   |
+| `DELETE /api/cart/items/:variantId` | Remove an item                                      | Yes                   |
+| `POST /api/cart/preview`            | Price a guest cart without saving it                | No                    |
+| `POST /api/cart/merge`              | Move a guest cart into the user's cart              | Yes                   |
 
 An item can have a quantity of up to 99, and adding more than the available stock returns `409`. Carts do not reserve stock, so `stock` can drop below `quantity` after an item is added. Show a warning when it does. Items that are deactivated stay in the cart with `available: false`, and are left out of the subtotal.
 
@@ -384,23 +363,23 @@ A merge keeps the higher quantity for an item in both carts, so retrying one is 
 
 Customers check out with cash on delivery or a manual payment method, and guests can check out without an account. Tax and shipping are added at checkout, and an order keeps its own copy of its prices and address, so later changes never alter it.
 
-| Endpoint | Description | Access |
-|---|---|---|
-| `POST /api/orders/preview` | Price items with shipping and tax | Public |
-| `POST /api/orders` | Check out the cart | Customer |
-| `GET /api/orders` | List your orders | Customer |
-| `GET /api/orders/:id` | Get one of your orders | Customer |
-| `POST /api/orders/:id/payment` | Submit a payment reference | Customer |
-| `POST /api/orders/:id/cancel` | Cancel a pending or unpaid order | Customer |
-| `POST /api/orders/guest` | Check out as a guest | Public |
-| `GET /api/orders/guest/:token` | View a guest order | Private link |
-| `POST /api/orders/guest/:token/payment` | Submit a payment reference | Private link |
-| `GET /api/orders/admin` | List all orders | Admin |
-| `GET /api/orders/admin/:id` | Get any order | Admin |
-| `PATCH /api/orders/admin/:id/status` | Move an order to its next status | Admin |
-| `POST /api/orders/admin/:id/payment/confirm` | Confirm a submitted payment | Admin |
-| `POST /api/orders/admin/:id/payment/reject` | Reject a payment, cancelling the order | Admin |
-| `POST /api/orders/admin/:id/payment/refund` | Record a refund made outside the system | Admin |
+| Endpoint                                     | Description                             | Access       |
+| -------------------------------------------- | --------------------------------------- | ------------ |
+| `POST /api/orders/preview`                   | Price items with shipping and tax       | Public       |
+| `POST /api/orders`                           | Check out the cart                      | Customer     |
+| `GET /api/orders`                            | List your orders                        | Customer     |
+| `GET /api/orders/:id`                        | Get one of your orders                  | Customer     |
+| `POST /api/orders/:id/payment`               | Submit a payment reference              | Customer     |
+| `POST /api/orders/:id/cancel`                | Cancel a pending or unpaid order        | Customer     |
+| `POST /api/orders/guest`                     | Check out as a guest                    | Public       |
+| `GET /api/orders/guest/:token`               | View a guest order                      | Private link |
+| `POST /api/orders/guest/:token/payment`      | Submit a payment reference              | Private link |
+| `GET /api/orders/admin`                      | List all orders                         | Admin        |
+| `GET /api/orders/admin/:id`                  | Get any order                           | Admin        |
+| `PATCH /api/orders/admin/:id/status`         | Move an order to its next status        | Admin        |
+| `POST /api/orders/admin/:id/payment/confirm` | Confirm a submitted payment             | Admin        |
+| `POST /api/orders/admin/:id/payment/reject`  | Reject a payment, cancelling the order  | Admin        |
+| `POST /api/orders/admin/:id/payment/refund`  | Record a refund made outside the system | Admin        |
 
 ### Checking Out
 
@@ -428,13 +407,13 @@ Checkout takes a `paymentMethod`, which is `cod` or the ID of a manual method. G
 
 Admins manage the manual methods, so GCash, Maya, banks, and PayPal can be added without code changes:
 
-| Endpoint | Description | Access |
-|---|---|---|
-| `GET /api/payment-methods` | List enabled methods, without account details | Public |
-| `GET /api/payment-methods/admin` | List all methods with account details | Admin |
-| `POST /api/payment-methods` | Add a method | Admin |
-| `PATCH /api/payment-methods/:id` | Update or turn off a method | Admin |
-| `DELETE /api/payment-methods/:id` | Delete a method no order has used | Admin |
+| Endpoint                          | Description                                   | Access |
+| --------------------------------- | --------------------------------------------- | ------ |
+| `GET /api/payment-methods`        | List enabled methods, without account details | Public |
+| `GET /api/payment-methods/admin`  | List all methods with account details         | Admin  |
+| `POST /api/payment-methods`       | Add a method                                  | Admin  |
+| `PATCH /api/payment-methods/:id`  | Update or turn off a method                   | Admin  |
+| `DELETE /api/payment-methods/:id` | Delete a method no order has used             | Admin  |
 
 ```json
 {
@@ -463,7 +442,7 @@ Orders copy the account they were placed with, so a customer keeps seeing the ac
 
 ### Guest Checkout
 
-Guests send their email, address, and items to `POST /api/orders/guest`, using the same preview flow. The response includes a `guestToken`, which is the only way back to the order, so show it as a private link. It cannot be recovered later, until emails can carry it.
+Guests send their email, address, and items to `POST /api/orders/guest`, using the same preview flow. The response includes a `guestToken`, which is the only way back to the order, so show it as a private link. It cannot be recovered later, as emails do not carry it yet.
 
 Links do not expire, so a finished order stops showing the shipping address. Guest orders are never linked to an account, even if the email matches one, as emails are not verified. Responses do not reveal whether an email is registered.
 
@@ -488,11 +467,11 @@ No payment provider is connected. To add one, such as Stripe:
 
 Set these in `.env`:
 
-| Variable | Default | Description |
-|---|---|---|
-| `TAX_RATE_PERCENT` | `12` | Tax rate. Use `0` to charge none, and decimals such as `7.5` are allowed |
-| `PRICES_INCLUDE_TAX` | `true` | `true` means prices contain tax, and `false` adds it on top |
-| `SHIPPING_FEE_CENTS` | `10000` | Flat shipping fee |
+| Variable             | Default | Description                                                              |
+| -------------------- | ------- | ------------------------------------------------------------------------ |
+| `TAX_RATE_PERCENT`   | `12`    | Tax rate. Use `0` to charge none, and decimals such as `7.5` are allowed |
+| `PRICES_INCLUDE_TAX` | `true`  | `true` means prices contain tax, and `false` adds it on top              |
+| `SHIPPING_FEE_CENTS` | `10000` | Flat shipping fee                                                        |
 
 Tax applies to items and shipping. Orders show `vatableCents`, `taxCents`, and `totalCents`, and keep the rate and fee they were placed with. This is an order summary, not an official invoice.
 
@@ -502,14 +481,14 @@ To use a courier's rates, change `calculateShipping` in `order.service.ts`, whic
 
 Logged-in users can save up to 20 delivery addresses in the Philippines. Requesting another user's address returns `404`.
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/addresses` | List addresses, default first |
-| `GET /api/addresses/:id` | Get an address |
-| `POST /api/addresses` | Add an address |
-| `PATCH /api/addresses/:id` | Update an address |
-| `DELETE /api/addresses/:id` | Delete an address |
-| `POST /api/addresses/:id/default` | Make an address the default |
+| Endpoint                          | Description                   |
+| --------------------------------- | ----------------------------- |
+| `GET /api/addresses`              | List addresses, default first |
+| `GET /api/addresses/:id`          | Get an address                |
+| `POST /api/addresses`             | Add an address                |
+| `PATCH /api/addresses/:id`        | Update an address             |
+| `DELETE /api/addresses/:id`       | Delete an address             |
+| `POST /api/addresses/:id/default` | Make an address the default   |
 
 ```json
 {
@@ -542,16 +521,16 @@ Attaching an image takes two steps:
 2. Attach it using the id, as shown below.
 ```
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/assets` | List uploaded files |
-| `POST /api/assets` | Upload a JPEG, PNG, or WebP image of up to 5 MB |
-| `DELETE /api/assets/:id` | Delete a file that nothing uses |
-| `POST /api/products/:id/images` | Add an asset to a product, up to 10 |
-| `PATCH /api/products/:id/images/:imageId` | Change an image's alt text or position |
-| `DELETE /api/products/:id/images/:imageId` | Remove an image from a product, keeping the file |
+| Endpoint                                      | Description                                                 |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| `GET /api/assets`                             | List uploaded files                                         |
+| `POST /api/assets`                            | Upload a JPEG, PNG, or WebP image of up to 5 MB             |
+| `DELETE /api/assets/:id`                      | Delete a file that nothing uses                             |
+| `POST /api/products/:id/images`               | Add an asset to a product, up to 10                         |
+| `PATCH /api/products/:id/images/:imageId`     | Change an image's alt text or position                      |
+| `DELETE /api/products/:id/images/:imageId`    | Remove an image from a product, keeping the file            |
 | `PATCH /api/products/:id/variants/:variantId` | Set `assetId` to give a variant one of the product's images |
-| `POST /api/blogs` or `PATCH /api/blogs/:id` | Set `coverAssetId` to give a blog a cover |
+| `POST /api/blogs` or `PATCH /api/blogs/:id`   | Set `coverAssetId` to give a blog a cover                   |
 
 File types are checked from the file's contents, and uploaded filenames are never used. A file cannot be deleted while a product, variant, or blog uses it.
 
@@ -598,7 +577,16 @@ Errors also show `lastStep` and `steps`, the work a request finished before fail
   "userId": "a81b...",
   "status": 409,
   "lastStep": "Items checked",
-  "steps": ["Authenticated", "Validated body", "Checkout started", "Address loaded", "Cart loaded", "Payment method checked", "Order limit checked", "Items checked"],
+  "steps": [
+    "Authenticated",
+    "Validated body",
+    "Checkout started",
+    "Address loaded",
+    "Cart loaded",
+    "Payment method checked",
+    "Order limit checked",
+    "Items checked"
+  ],
   "msg": "The order total has changed"
 }
 ```

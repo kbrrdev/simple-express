@@ -44,7 +44,7 @@ Pricing and limits change, so check each provider's site before relying on them.
 
 **How to implement:** updates are set up in [`.github/dependabot.yml`](../.github/dependabot.yml). Also turn on **Dependabot alerts** on the same settings page.
 
-**Usage:** review the pull requests it opens, and merge them when the checks pass. Alerts appear under the **Security** tab.
+**Usage:** review the pull requests it opens, and merge them when the checks pass. Close major updates to Node.js, TypeScript, and `@types/node`, as those are upgraded on purpose, together with the Dockerfile and CI. Alerts appear under the **Security** tab.
 
 ## CI Checks
 
