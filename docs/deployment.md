@@ -114,6 +114,7 @@ LOG_LEVEL=info
 TRUST_PROXY_HOPS=1
 PUBLIC_BASE_URL=https://api.your-store.com
 CORS_ORIGINS=https://your-store.com
+PASSWORD_RESET_URL=https://your-store.com/reset-password
 JWT_SECRET=
 POSTGRES_PASSWORD=
 APP_DB_PASSWORD=

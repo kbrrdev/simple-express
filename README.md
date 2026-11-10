@@ -263,6 +263,8 @@ Clients log in with an email and password and receive two tokens:
 | `POST /api/auth/login`           | Start a session                            | No                    |
 | `POST /api/auth/refresh`         | Get new tokens                             | No                    |
 | `POST /api/auth/change-password` | Change the password, ending other sessions | Yes                   |
+| `POST /api/auth/forgot-password` | Email a password reset link                | No                    |
+| `POST /api/auth/reset-password`  | Set a new password, ending all sessions    | No                    |
 | `POST /api/auth/logout`          | End the current session                    | Yes                   |
 | `POST /api/auth/logout-all`      | End all sessions for the user              | Yes                   |
 | `GET /api/auth/me`               | Get the current user                       | Yes                   |
@@ -275,6 +277,8 @@ Login requires a `client` value:
 Every access token belongs to a session, and the session is checked on each protected request, so logout takes effect immediately. Each refresh token holds its session ID and is signed. Reusing any old refresh token revokes the session, apart from the one just replaced, which is allowed for 30 seconds for retries and parallel tabs.
 
 Passwords must be 8 to 128 characters and cannot be a common password. After five failed logins, an email is delayed for 30 seconds, doubling up to five minutes, even with the right password. A quiet 15 minutes resets this.
+
+Forgotten passwords are reset by email. The link opens `PASSWORD_RESET_URL`, a page in your storefront, with the token after `#token=`. The page sends it to `/api/auth/reset-password` with the new password. Links expire in 30 minutes and work once.
 
 To protect a route, add the `requireAuth` middleware. The current user is then available in `res.locals.auth`. Reading blogs is public.
 

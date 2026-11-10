@@ -129,6 +129,9 @@ Central route registration. Module routes are mounted under `/api`.
 - Roles can only be changed with the `db:make-admin` script, not through the API.
 - Passwords are hashed with Argon2id using Node's built-in `crypto` module.
 - New passwords are checked against a bundled list of common passwords. Changing a password keeps the current session and revokes the others.
+- Password reset emails a link to `PASSWORD_RESET_URL` with `#token=...`, as fragments are never sent to servers or logged. Only the token's SHA-256 hash is stored in `password_resets`.
+- A reset token expires in 30 minutes and works once. Each new request cancels the older tokens, and an account gets at most three emails an hour. Resetting revokes every session and clears failed logins.
+- `forgot-password` always returns `202` and sends the email after the response, so neither the response nor its timing shows whether an email has an account.
 - Login, registration, password changes, and token refresh are rate limited per IP address, in memory.
 - Failed logins are also tracked per email in `login_attempts`, including unknown emails. After five failures, the email is delayed for 30 seconds, doubling up to five minutes.
 

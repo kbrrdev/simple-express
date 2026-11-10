@@ -150,6 +150,44 @@ export const authPaths = {
       },
     },
   },
+  '/api/auth/forgot-password': {
+    post: {
+      tags,
+      summary: 'Email a password reset link',
+      description:
+        'Always returns 202, whether or not the email has an account. The link opens `PASSWORD_RESET_URL` with `#token=...`, and expires in 30 minutes. Only the newest link works, and each account gets at most three an hour.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': { schema: { $ref: '#/components/schemas/ForgotPasswordBody' } },
+        },
+      },
+      responses: {
+        202: { description: 'If the email has an account, a reset link is sent' },
+        400: badRequest,
+        429: tooManyRequests,
+      },
+    },
+  },
+  '/api/auth/reset-password': {
+    post: {
+      tags,
+      summary: 'Set a new password with a reset token',
+      description: 'The token works once. All of the user’s sessions are revoked.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': { schema: { $ref: '#/components/schemas/ResetPasswordBody' } },
+        },
+      },
+      responses: {
+        204: { description: 'The password was changed' },
+        400: badRequest,
+        429: tooManyRequests,
+        500: serverError,
+      },
+    },
+  },
   '/api/auth/logout': {
     post: {
       tags,
@@ -220,6 +258,29 @@ export const authSchemas = {
     additionalProperties: false,
     properties: {
       currentPassword: { type: 'string', maxLength: 128, example: 'correct-horse-battery' },
+      newPassword: {
+        type: 'string',
+        minLength: 8,
+        maxLength: 128,
+        description: 'Common passwords are rejected',
+        example: 'another-long-passphrase',
+      },
+    },
+  },
+  ForgotPasswordBody: {
+    type: 'object',
+    required: ['email'],
+    additionalProperties: false,
+    properties: {
+      email: { type: 'string', format: 'email', maxLength: 255, example: 'jane@example.com' },
+    },
+  },
+  ResetPasswordBody: {
+    type: 'object',
+    required: ['token', 'newPassword'],
+    additionalProperties: false,
+    properties: {
+      token: { type: 'string', maxLength: 128, description: 'The token from the emailed link' },
       newPassword: {
         type: 'string',
         minLength: 8,
