@@ -139,9 +139,17 @@ Central route registration. Module routes are mounted under `/api`.
 
 Published blogs are public to read, and drafts are hidden, including by direct link. Only admins can write blogs or read drafts.
 
+## Categories
+
+- `parent_id` nests categories, up to three levels. Products can belong to any level, and filtering products by a category includes its subcategories.
+- Names are unique among siblings. The unique index treats nulls as equal, so top-level names are unique too.
+- Changing `parent_id` moves the whole subtree. Moves into the category's own subtree, or past three levels, are rejected.
+- Changes take an advisory lock and run one at a time, so that two moves cannot form a loop. Stores have few categories, so they are read whole for these checks and for `/api/categories/tree`.
+- A category cannot be deleted while it has subcategories or products.
+
 ## Products
 
-- Each product belongs to one category, and a category cannot be deleted while products use it.
+- Each product belongs to one category.
 - A product has zero to two options, named per product in `option1_name` and `option2_name`, such as Size and Color.
 - Each product has at least one row in `product_variants`, which holds the option values, price, and stock. A product with no options has one variant with no values.
 - Prices are stored as integer cents.
@@ -198,6 +206,7 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - `env.ts` rejects a partial S3 setup at startup, so that uploads never fall back to disk by accident.
 - A product has up to 10 rows in `product_images`, which hold the alt text and position. A variant's `asset_id` has a composite foreign key to `product_images`, which keeps the image on the same product and blocks removing it while in use.
 - Cart and order items use the variant's image, then the product's first image. Order items also block deleting the asset.
+- Blogs have an optional cover image, and categories an optional image, each referencing `assets`.
 
 ## Logging
 

@@ -118,6 +118,129 @@ describe('categories', () => {
   });
 });
 
+describe('nested categories', () => {
+  async function createCategory(name: string, parentId?: string | null) {
+    const response = await asAdmin.post('/api/categories', { name, parentId }).expect(201);
+    return response.body.data.id as string;
+  }
+
+  const move = (id: string, parentId: string | null) =>
+    asAdmin.patch(`/api/categories/${id}`, { parentId });
+
+  it('returns the path above a category', async () => {
+    const men = await createCategory('Men');
+    const shoes = await createCategory('Shoes', men);
+    const running = await createCategory('Running', shoes);
+
+    const response = await api().get(`/api/categories/${running}`).expect(200);
+
+    expect(response.body.data).toMatchObject({ name: 'Running', parentId: shoes });
+    expect(response.body.data.path).toEqual([
+      { id: men, name: 'Men' },
+      { id: shoes, name: 'Shoes' },
+    ]);
+  });
+
+  it('returns every category as a tree', async () => {
+    const men = await createCategory('Men');
+    await createCategory('Shoes', men);
+    await createCategory('Bags', men);
+
+    const response = await api().get('/api/categories/tree').expect(200);
+    const names = (nodes: { name: string; children: never[] }[]): unknown[] =>
+      nodes.map((node) => [node.name, names(node.children)]);
+
+    expect(names(response.body.data)).toEqual([
+      [
+        'Men',
+        [
+          ['Bags', []],
+          ['Shoes', []],
+        ],
+      ],
+      ['T-Shirts', []],
+    ]);
+  });
+
+  it('allows the same name under different parents only', async () => {
+    const men = await createCategory('Men');
+    const women = await createCategory('Women');
+    await createCategory('Shoes', men);
+    await createCategory('Shoes', women);
+
+    await asAdmin.post('/api/categories', { name: 'Shoes', parentId: men }).expect(409);
+    await asAdmin.post('/api/categories', { name: 'Men' }).expect(409);
+  });
+
+  it('rejects an unknown parent', async () => {
+    const response = await asAdmin
+      .post('/api/categories', { name: 'Shoes', parentId: missingId })
+      .expect(400);
+
+    expect(response.body.error.message).toBe('Parent category does not exist');
+  });
+
+  it('limits the depth to three levels', async () => {
+    const men = await createCategory('Men');
+    const shoes = await createCategory('Shoes', men);
+    const running = await createCategory('Running', shoes);
+
+    await asAdmin.post('/api/categories', { name: 'Trail', parentId: running }).expect(400);
+    await move(men, categoryId).expect(400);
+    await move(shoes, categoryId).expect(200);
+  });
+
+  it('moves a category with everything below it', async () => {
+    const men = await createCategory('Men');
+    const shoes = await createCategory('Shoes', men);
+    const running = await createCategory('Running', shoes);
+
+    await move(shoes, null).expect(200);
+
+    const response = await api().get(`/api/categories/${running}`).expect(200);
+    expect(response.body.data.path).toEqual([{ id: shoes, name: 'Shoes' }]);
+  });
+
+  it('cannot move a category inside itself', async () => {
+    const men = await createCategory('Men');
+    const shoes = await createCategory('Shoes', men);
+
+    await move(men, men).expect(400);
+    const response = await move(men, shoes).expect(400);
+
+    expect(response.body.error.message).toBe('A category cannot be moved inside itself');
+  });
+
+  it('can be deleted only without subcategories', async () => {
+    const men = await createCategory('Men');
+    const shoes = await createCategory('Shoes', men);
+
+    const response = await asAdmin.delete(`/api/categories/${men}`).expect(409);
+    expect(response.body.error.message).toBe('Category still has subcategories');
+
+    await asAdmin.delete(`/api/categories/${shoes}`).expect(204);
+    await asAdmin.delete(`/api/categories/${men}`).expect(204);
+  });
+
+  it('includes subcategories when filtering products', async () => {
+    const men = await createCategory('Men');
+    const shoes = await createCategory('Shoes', men);
+    await createProduct({ ...mug(), name: 'Sneaker', categoryId: shoes });
+    await createProduct({ ...mug(), name: 'Cap', categoryId: men });
+    await createProduct(mug());
+
+    const response = await api()
+      .get('/api/products')
+      .query({ categoryId: men, sort: 'name' })
+      .expect(200);
+
+    expect(response.body.data.map((product: { name: string }) => product.name)).toEqual([
+      'Cap',
+      'Sneaker',
+    ]);
+  });
+});
+
 describe('creating products', () => {
   it('creates a product with two options', async () => {
     const response = await asAdmin.post('/api/products', shirt()).expect(201);

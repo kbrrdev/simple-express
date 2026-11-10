@@ -5,6 +5,7 @@ import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../l
 import { logger } from '../../lib/logger';
 import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
+import { findCategoryAndDescendantIds } from '../categories/category.service';
 import {
   productImages,
   products,
@@ -42,9 +43,10 @@ export async function listProducts(
   { page, limit, search, categoryId, sort }: ListProductsQuery,
   includeInactive = false,
 ) {
+  const categoryIds = categoryId ? await findCategoryAndDescendantIds(categoryId) : undefined;
   const where = and(
     includeInactive ? undefined : isPublic,
-    categoryId ? eq(products.categoryId, categoryId) : undefined,
+    categoryIds ? inArray(products.categoryId, categoryIds) : undefined,
     search ? ilike(products.name, `%${escapeLikePattern(search)}%`) : undefined,
   );
   const orderBy =

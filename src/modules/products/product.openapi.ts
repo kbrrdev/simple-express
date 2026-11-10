@@ -41,7 +41,12 @@ const listParameters = [
     description: 'Matches part of the product name, ignoring case',
     schema: { type: 'string', maxLength: 255 },
   },
-  { name: 'categoryId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+  {
+    name: 'categoryId',
+    in: 'query',
+    description: 'Includes products in its subcategories',
+    schema: { type: 'string', format: 'uuid' },
+  },
   {
     name: 'sort',
     in: 'query',

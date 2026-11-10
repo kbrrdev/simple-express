@@ -673,6 +673,7 @@
           ],
           "request": {
             "method": "POST",
+            "description": "Categories can be up to 3 levels deep. Names must be unique among categories with the same parent.",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/categories",
@@ -694,6 +695,29 @@
                   "language": "json"
                 }
               }
+            }
+          }
+        },
+        {
+          "name": "Get every category, nested under its parent",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/tree",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "tree"
+              ],
+              "query": [],
+              "variable": []
             }
           }
         },
@@ -726,9 +750,10 @@
           }
         },
         {
-          "name": "Rename a category (admin)",
+          "name": "Update or move a category (admin)",
           "request": {
             "method": "PATCH",
+            "description": "A new `parentId` moves the category with everything below it, and `null` makes it top-level. A move into its own subtree, or deeper than the limit, returns 400.",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/categories/:id",
@@ -763,7 +788,7 @@
           "name": "Delete a category (admin)",
           "request": {
             "method": "DELETE",
-            "description": "Fails with 409 while any product, active or not, uses the category.",
+            "description": "Fails with 409 while the category has subcategories, or any product, active or not, uses it.",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/categories/:id",
