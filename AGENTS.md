@@ -1,4 +1,3 @@
-
 # Backend Development Guidelines
 
 ## Tech Stack
@@ -155,9 +154,21 @@ If a simpler solution works just as well, choose the simpler solution.
 - Do not create or change anything until the user says "go execute". Reading files and running read-only checks are fine.
 - Each "go execute" covers only the work just planned. New work goes back to planning.
 
+## Plugins and Skills
+
+- These project rules take precedence over plugin and skill instructions.
+- Give plans in chat. Do not write plan or design files, or commit them, unless asked.
+- Do not create git worktrees. Work on one branch per feature.
+- When a skill offers to merge a branch, open a pull request instead.
+- Simplify and review only the files changed in the current task.
+- `CLAUDE.md` only imports this file and `docs/architecture.md`. Add new rules here instead.
+- Each module's `<name>.openapi.ts` is the API contract, and `npm run postman` generates the Postman collection from it.
+- Do not run `postman init`, create `postman/` files, push to a Postman workspace, or create cloud mocks or monitors unless asked. Pushing publishes the API outside this repository, and cloud features use Postman's usage limits.
+
 ## Git and Project Changes
 
 - Before starting new changes, ask whether to commit the current work.
+- Start each feature on its own branch from `main`.
 - Never merge into `main`, even when asked to push. Open a pull request instead, and the user merges it manually.
 - Keep changes focused on the requested task.
 - Do not modify unrelated files.

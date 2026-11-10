@@ -6,28 +6,28 @@ The tools used to find problems are described in [security-tools.md](security-to
 
 ## Status
 
-| #   | Gap                                    | Severity      | Status             |
-| --- | -------------------------------------- | ------------- | ------------------ |
-| 1   | `trust proxy` not configured           | High          | Fixed              |
-| 2   | API connected as a database superuser  | High          | Fixed              |
-| 3   | Swagger public in production           | Low to Medium | Fixed              |
-| 4   | No way to change a password            | High          | Fixed              |
-| 5   | No password reset                      | High          | Open, needs email  |
-| 6   | Rate limits were IP-only               | Medium        | Fixed, with a note |
-| 7   | No security headers                    | Medium        | Fixed              |
-| 8   | Weak passwords allowed                 | Medium        | Fixed              |
-| 9   | Stolen-token detection was shallow     | Medium        | Fixed              |
-| 10  | No email verification                  | Medium        | Later, needs email |
-| 11  | Registration reveals existing emails   | Low           | Later, needs email |
-| 12  | Database published with a weak default | Critical      | Fixed              |
-| 13  | Stock could be held for free           | High          | Fixed, with a note |
-| 14  | Secrets in error logs                  | High          | Fixed              |
-| 15  | Draft blogs were public                | Medium        | Fixed              |
-| 16  | Admin login has no second factor       | High          | Open               |
-| 17  | Guest links never expire               | Medium        | Fixed, with a note |
-| 18  | No automatic checks on GitHub          | Medium        | Fixed, with a note |
-| 19  | Large order totals failed              | Low           | Fixed              |
-| 20  | API published on all addresses         | Medium        | Fixed              |
+| #   | Gap                                    | Severity      | Status               |
+| --- | -------------------------------------- | ------------- | -------------------- |
+| 1   | `trust proxy` not configured           | High          | Fixed                |
+| 2   | API connected as a database superuser  | High          | Fixed                |
+| 3   | Swagger public in production           | Low to Medium | Fixed                |
+| 4   | No way to change a password            | High          | Fixed                |
+| 5   | No password reset                      | High          | Open, email is ready |
+| 6   | Rate limits were IP-only               | Medium        | Fixed, with a note   |
+| 7   | No security headers                    | Medium        | Fixed                |
+| 8   | Weak passwords allowed                 | Medium        | Fixed                |
+| 9   | Stolen-token detection was shallow     | Medium        | Fixed                |
+| 10  | No email verification                  | Medium        | Later                |
+| 11  | Registration reveals existing emails   | Low           | Later                |
+| 12  | Database published with a weak default | Critical      | Fixed                |
+| 13  | Stock could be held for free           | High          | Fixed, with a note   |
+| 14  | Secrets in error logs                  | High          | Fixed                |
+| 15  | Draft blogs were public                | Medium        | Fixed                |
+| 16  | Admin login has no second factor       | High          | Open                 |
+| 17  | Guest links never expire               | Medium        | Fixed, with a note   |
+| 18  | No automatic checks on GitHub          | Medium        | Fixed, with a note   |
+| 19  | Large order totals failed              | Low           | Fixed                |
+| 20  | API published on all addresses         | Medium        | Fixed                |
 
 ## Fixed
 
@@ -142,7 +142,7 @@ The API could be reached directly, skipping the proxy and HTTPS, as Docker can b
 
 **Risk:** a forgotten password locks the customer out for good.
 
-**Plan:** email a random, single-use token that expires in about 30 minutes, and store only its hash. Using it revokes all sessions. Add Mailpit to `docker-compose.dev.yml` at the same time, so that development emails are caught locally, and use a real email provider in production.
+**Plan:** email a random, single-use token that expires in about 30 minutes, and store only its hash. Using it revokes all sessions. Send it with `sendEmail` from `src/lib/email.ts`, which uses Mailpit in development.
 
 ## Later
 
@@ -156,11 +156,11 @@ The API could be reached directly, skipping the proxy and HTTPS, as Docker can b
 
 **Risk:** the `409` response shows whether an email has an account. Registration is rate limited, which slows this down.
 
-**Plan:** always return the same response, and send an email to explain. Until email exists, this is an accepted risk.
+**Plan:** always return the same response, and send an email to explain. Until this is built, it is an accepted risk.
 
-## Waiting on Email
+## Ready to Build with Email
 
-These need an email service. Use Mailpit in development and a real provider in production.
+Email is set up with `sendEmail` in `src/lib/email.ts`, Mailpit in development, and a provider set in [deployment.md](deployment.md). These can now be built:
 
 - Password reset (gap 5)
 - Email verification (gap 10)
