@@ -14,6 +14,15 @@ export interface RefreshBody {
   refreshToken?: string;
 }
 
+export interface ForgotPasswordBody {
+  email: string;
+}
+
+export interface ResetPasswordBody {
+  token: string;
+  newPassword: string;
+}
+
 export interface ChangePasswordBody {
   currentPassword: string;
   newPassword: string;
@@ -43,6 +52,13 @@ export const loginBody = Joi.object<LoginBody>({
 
 export const changePasswordBody = Joi.object<ChangePasswordBody>({
   currentPassword: Joi.string().max(128).required(),
+  newPassword,
+});
+
+export const forgotPasswordBody = Joi.object<ForgotPasswordBody>({ email });
+
+export const resetPasswordBody = Joi.object<ResetPasswordBody>({
+  token: Joi.string().max(128).required(),
   newPassword,
 });
 

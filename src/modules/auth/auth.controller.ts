@@ -1,8 +1,17 @@
 import type { CookieOptions, Request, Response } from 'express';
 import { env } from '../../config/env';
 import { AppError } from '../../lib/app-error';
+import { toSafeLog } from '../../lib/db-errors';
+import { logger } from '../../lib/logger';
 import * as authService from './auth.service';
-import type { ChangePasswordBody, LoginBody, RefreshBody, RegisterBody } from './auth.validation';
+import type {
+  ChangePasswordBody,
+  ForgotPasswordBody,
+  LoginBody,
+  RefreshBody,
+  RegisterBody,
+  ResetPasswordBody,
+} from './auth.validation';
 
 const REFRESH_COOKIE = 'refreshToken';
 
@@ -76,6 +85,25 @@ export async function changePassword(
 ) {
   const { userId, sessionId } = res.locals.auth;
   await authService.changePassword(userId, sessionId, req.body);
+  res.status(204).send();
+}
+
+/** Always 202, and the email is sent afterwards, so the response never shows who has an account. */
+export function forgotPassword(req: Request<object, object, ForgotPasswordBody>, res: Response) {
+  res.status(202).send();
+
+  authService.requestPasswordReset(req.body.email).catch((error: unknown) => {
+    // Mail server errors can repeat the recipient, so only database details are kept.
+    const err = toSafeLog(error);
+    logger.error({ err: err instanceof Error ? err.name : err }, 'Password reset request failed');
+  });
+}
+
+export async function resetPassword(
+  req: Request<object, object, ResetPasswordBody>,
+  res: Response,
+) {
+  await authService.resetPassword(req.body);
   res.status(204).send();
 }
 

@@ -7,14 +7,15 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { promisify } from 'node:util';
-import { and, eq, gt, isNull, lte, ne, sql } from 'drizzle-orm';
+import { and, count, eq, gt, isNull, lte, ne, sql } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
+import { sendEmail } from '../../lib/email';
 import { logger } from '../../lib/logger';
-import { loginAttempts, sessions, users } from './auth.schema';
-import type { ChangePasswordBody, RegisterBody } from './auth.validation';
+import { loginAttempts, passwordResets, sessions, users } from './auth.schema';
+import type { ChangePasswordBody, RegisterBody, ResetPasswordBody } from './auth.validation';
 
 export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const REFRESH_GRACE_PERIOD_MS = 30 * 1000;
@@ -23,6 +24,10 @@ const ACCESS_TOKEN_TTL = '15m';
 const FREE_LOGIN_ATTEMPTS = 5;
 const FIRST_LOGIN_DELAY_SECONDS = 30;
 const MAX_LOGIN_DELAY_SECONDS = 300;
+
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
+const MAX_RESET_EMAILS_PER_HOUR = 3;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 const argon2Async = promisify(argon2);
 const argon2Options = { parallelism: 1, tagLength: 32, memory: 19456, passes: 2 };
@@ -314,6 +319,114 @@ export async function changePassword(
   });
 
   logger.info('Password changed, other sessions ended');
+}
+
+/**
+ * Runs after the response is sent, so its timing cannot show whether the email has an account.
+ * Only the newest link works, and each account gets at most three emails an hour.
+ */
+export async function requestPasswordReset(email: string) {
+  const token = randomBytes(32).toString('base64url');
+  const now = new Date();
+
+  const userId = await db.transaction(async (tx) => {
+    // Locked, so that parallel requests cannot pass the hourly limit.
+    const [user] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .for('update');
+
+    if (!user) return undefined;
+
+    await tx
+      .delete(passwordResets)
+      .where(
+        and(
+          eq(passwordResets.userId, user.id),
+          lte(passwordResets.createdAt, new Date(now.getTime() - ONE_HOUR_MS)),
+        ),
+      );
+
+    const [recent] = await tx
+      .select({ total: count() })
+      .from(passwordResets)
+      .where(eq(passwordResets.userId, user.id));
+
+    if (recent && recent.total >= MAX_RESET_EMAILS_PER_HOUR) {
+      logger.warn('Password reset email limit reached');
+      return undefined;
+    }
+
+    await tx
+      .update(passwordResets)
+      .set({ expiresAt: now })
+      .where(and(eq(passwordResets.userId, user.id), isNull(passwordResets.usedAt)));
+
+    await tx.insert(passwordResets).values({
+      userId: user.id,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(now.getTime() + PASSWORD_RESET_TTL_MS),
+    });
+
+    return user.id;
+  });
+
+  if (!userId) return;
+
+  await sendEmail({
+    to: email,
+    subject: 'Reset your password',
+    text: [
+      'Someone asked to reset the password for your account. To choose a new password, open this link within 30 minutes:',
+      '',
+      `${env.PASSWORD_RESET_URL}#token=${token}`,
+      '',
+      'If this was not you, ignore this email. Your password has not changed.',
+    ].join('\n'),
+  });
+}
+
+/** Ends every session, as the old password may have been stolen. */
+export async function resetPassword({ token, newPassword }: ResetPasswordBody) {
+  const passwordHash = await hashPassword(newPassword);
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    const [reset] = await tx
+      .update(passwordResets)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResets.tokenHash, hashToken(token)),
+          isNull(passwordResets.usedAt),
+          gt(passwordResets.expiresAt, now),
+        ),
+      )
+      .returning({ userId: passwordResets.userId });
+
+    if (!reset) throw new AppError(400, 'This reset link is invalid or has expired');
+
+    const [user] = await tx
+      .update(users)
+      .set({ passwordHash })
+      .where(eq(users.id, reset.userId))
+      .returning({ email: users.email });
+
+    await tx
+      .update(sessions)
+      .set({ revokedAt: now })
+      .where(and(eq(sessions.userId, reset.userId), isNull(sessions.revokedAt)));
+
+    await tx
+      .update(passwordResets)
+      .set({ expiresAt: now })
+      .where(and(eq(passwordResets.userId, reset.userId), isNull(passwordResets.usedAt)));
+
+    if (user) await tx.delete(loginAttempts).where(eq(loginAttempts.email, user.email));
+  });
+
+  logger.info('Password reset, all sessions ended');
 }
 
 export async function getUser(userId: string) {

@@ -14,6 +14,7 @@ interface Env {
   CORS_ORIGINS: string[];
   JWT_SECRET: string;
   PUBLIC_BASE_URL: string;
+  PASSWORD_RESET_URL: string;
   SMTP_HOST?: string;
   SMTP_PORT: number;
   SMTP_USER?: string;
@@ -76,6 +77,7 @@ const envSchema = Joi.object<Env>({
   CORS_ORIGINS: Joi.string().empty('').default([]).custom(parseOrigins),
   JWT_SECRET: Joi.string().min(32).required(),
   PUBLIC_BASE_URL: url.default('http://localhost:3000'),
+  PASSWORD_RESET_URL: url.default('http://localhost:5173/reset-password'),
   SMTP_HOST: Joi.string().empty(''),
   SMTP_PORT: Joi.number().port().empty('').default(1025),
   SMTP_USER: Joi.string().empty(''),

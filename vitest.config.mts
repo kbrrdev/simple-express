@@ -25,6 +25,7 @@ export default defineConfig({
       JWT_SECRET: 'test-only-secret-that-is-at-least-32-characters',
       CORS_ORIGINS: 'http://localhost:5173',
       PUBLIC_BASE_URL: 'http://localhost:3000',
+      PASSWORD_RESET_URL: 'http://localhost:5173/reset-password',
       SMTP_HOST: '',
       SMTP_USER: '',
       SMTP_PASSWORD: '',
