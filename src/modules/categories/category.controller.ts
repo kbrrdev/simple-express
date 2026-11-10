@@ -1,6 +1,10 @@
 import type { Request, Response } from 'express';
 import * as categoryService from './category.service';
-import type { CategoryBody, ListCategoriesQuery } from './category.validation';
+import type {
+  CreateCategoryBody,
+  ListCategoriesQuery,
+  UpdateCategoryBody,
+} from './category.validation';
 
 type IdParams = { id: string };
 
@@ -12,16 +16,20 @@ export async function list(req: Request, res: Response) {
   res.json({ data: items, meta: { page: query.page, limit: query.limit, total } });
 }
 
+export async function tree(_req: Request, res: Response) {
+  res.json({ data: await categoryService.getCategoryTree() });
+}
+
 export async function get(req: Request<IdParams>, res: Response) {
   res.json({ data: await categoryService.getCategory(req.params.id) });
 }
 
-export async function create(req: Request<object, object, CategoryBody>, res: Response) {
+export async function create(req: Request<object, object, CreateCategoryBody>, res: Response) {
   const category = await categoryService.createCategory(req.body);
   res.status(201).location(`${req.baseUrl}/${category.id}`).json({ data: category });
 }
 
-export async function update(req: Request<IdParams, object, CategoryBody>, res: Response) {
+export async function update(req: Request<IdParams, object, UpdateCategoryBody>, res: Response) {
   res.json({ data: await categoryService.updateCategory(req.params.id, req.body) });
 }
 

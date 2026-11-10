@@ -315,13 +315,16 @@ Each product belongs to one category and can have up to two options, which you n
 
 A product with no options still has one variant, without any option values. Prices are in cents.
 
+Categories can be nested up to three levels, such as Men › Shoes › Running, and products can belong to any level. Set `parentId` to place a category under another, or `null` for a top-level one. Changing it moves the category with everything below it. Names must be unique among categories with the same parent, so Men › Shoes and Women › Shoes can both exist. A category can also have an image, set with `imageAssetId` after uploading it to `/api/assets`.
+
 | Endpoint                                       | Description                                  | Access |
 | ---------------------------------------------- | -------------------------------------------- | ------ |
 | `GET /api/categories`                          | List categories                              | Public |
-| `GET /api/categories/:id`                      | Get a category                               | Public |
+| `GET /api/categories/tree`                     | Get every category, nested                   | Public |
+| `GET /api/categories/:id`                      | Get a category and the categories above it   | Public |
 | `POST /api/categories`                         | Create a category                            | Admin  |
-| `PATCH /api/categories/:id`                    | Rename a category                            | Admin  |
-| `DELETE /api/categories/:id`                   | Delete a category with no products           | Admin  |
+| `PATCH /api/categories/:id`                    | Rename, move, or change a category's image   | Admin  |
+| `DELETE /api/categories/:id`                   | Delete an empty category                     | Admin  |
 | `GET /api/products`                            | List products on sale                        | Public |
 | `GET /api/products/:id`                        | Get a product on sale                        | Public |
 | `GET /api/products/admin`                      | List all products, including inactive ones   | Admin  |
@@ -333,7 +336,7 @@ A product with no options still has one variant, without any option values. Pric
 | `PATCH /api/products/:id/variants/:variantId`  | Update a variant                             | Admin  |
 | `DELETE /api/products/:id/variants/:variantId` | Deactivate a variant                         | Admin  |
 
-Product lists support `page`, `limit`, `search`, `categoryId`, and `sort` (`newest` or `name`).
+Product lists support `page`, `limit`, `search`, `categoryId`, and `sort` (`newest` or `name`). Filtering by a category includes its subcategories.
 
 To restore a deactivated product or variant, set `active` to `true` with `PATCH`.
 

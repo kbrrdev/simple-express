@@ -2,16 +2,22 @@ import { Router } from 'express';
 import { requireAdmin, requireAuth } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './category.controller';
-import { categoryBody, categoryParams, listCategoriesQuery } from './category.validation';
+import {
+  categoryParams,
+  createCategoryBody,
+  listCategoriesQuery,
+  updateCategoryBody,
+} from './category.validation';
 
 export const categoryRoutes = Router();
 
 categoryRoutes.get('/', validate('query', listCategoriesQuery), controller.list);
+categoryRoutes.get('/tree', controller.tree);
 categoryRoutes.post(
   '/',
   requireAuth,
   requireAdmin,
-  validate('body', categoryBody),
+  validate('body', createCategoryBody),
   controller.create,
 );
 categoryRoutes.get('/:id', validate('params', categoryParams), controller.get);
@@ -20,7 +26,7 @@ categoryRoutes.patch(
   requireAuth,
   requireAdmin,
   validate('params', categoryParams),
-  validate('body', categoryBody),
+  validate('body', updateCategoryBody),
   controller.update,
 );
 categoryRoutes.delete(

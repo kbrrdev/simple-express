@@ -483,6 +483,37 @@ describe('blog covers', () => {
   });
 });
 
+describe('category images', () => {
+  it('sets, shows and clears an image', async () => {
+    const asset = await upload();
+    const created = await asAdmin
+      .post('/api/categories', { name: 'Bags', imageAssetId: asset.id })
+      .expect(201);
+    const path = `/api/categories/${created.body.data.id}`;
+
+    expect(created.body.data).toMatchObject({ imageAssetId: asset.id, imageUrl: asset.url });
+
+    const tree = await api().get('/api/categories/tree').expect(200);
+    const bags = tree.body.data.find((node: { name: string }) => node.name === 'Bags');
+    expect(bags.imageUrl).toBe(asset.url);
+
+    const cleared = await asAdmin.patch(path, { imageAssetId: null }).expect(200);
+    expect(cleared.body.data).toMatchObject({ imageAssetId: null, imageUrl: null });
+  });
+
+  it('rejects an unknown asset', async () => {
+    await asAdmin.post('/api/categories', { name: 'Bags', imageAssetId: missingId }).expect(400);
+    await asAdmin.patch(`/api/categories/${categoryId}`, { imageAssetId: missingId }).expect(400);
+  });
+
+  it('blocks deleting an image a category uses', async () => {
+    const asset = await upload();
+    await asAdmin.patch(`/api/categories/${categoryId}`, { imageAssetId: asset.id }).expect(200);
+
+    await asAdmin.delete(`/api/assets/${asset.id}`).expect(409);
+  });
+});
+
 describe('cart images', () => {
   const preview = (variantId: string) =>
     api()

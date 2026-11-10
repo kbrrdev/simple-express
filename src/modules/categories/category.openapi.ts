@@ -1,19 +1,19 @@
+import { MAX_CATEGORY_DEPTH } from './category.validation';
+
 const categoryContent = {
   'application/json': {
     schema: {
       type: 'object',
       required: ['data'],
-      properties: { data: { $ref: '#/components/schemas/Category' } },
+      properties: { data: { $ref: '#/components/schemas/CategoryWithPath' } },
     },
   },
 };
 
-const categoryBody = {
+const bodyOf = (schema: string) => ({
   required: true,
-  content: {
-    'application/json': { schema: { $ref: '#/components/schemas/CategoryBody' } },
-  },
-};
+  content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } },
+});
 
 const badRequest = { $ref: '#/components/responses/BadRequest' };
 const unauthorized = { $ref: '#/components/responses/Unauthorized' };
@@ -63,7 +63,8 @@ export const categoryPaths = {
       tags,
       summary: 'Create a category (admin)',
       security,
-      requestBody: categoryBody,
+      description: `Categories can be up to ${MAX_CATEGORY_DEPTH} levels deep. Names must be unique among categories with the same parent.`,
+      requestBody: bodyOf('CreateCategoryBody'),
       responses: {
         201: {
           description: 'The created category',
@@ -76,6 +77,29 @@ export const categoryPaths = {
         401: unauthorized,
         403: forbidden,
         409: conflict,
+        500: serverError,
+      },
+    },
+  },
+  '/api/categories/tree': {
+    get: {
+      tags,
+      summary: 'Get every category, nested under its parent',
+      responses: {
+        200: {
+          description: 'The top-level categories, each with its children',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['data'],
+                properties: {
+                  data: { type: 'array', items: { $ref: '#/components/schemas/CategoryNode' } },
+                },
+              },
+            },
+          },
+        },
         500: serverError,
       },
     },
@@ -94,10 +118,12 @@ export const categoryPaths = {
     },
     patch: {
       tags,
-      summary: 'Rename a category (admin)',
+      summary: 'Update or move a category (admin)',
+      description:
+        'A new `parentId` moves the category with everything below it, and `null` makes it top-level. A move into its own subtree, or deeper than the limit, returns 400.',
       security,
       parameters: [categoryId],
-      requestBody: categoryBody,
+      requestBody: bodyOf('UpdateCategoryBody'),
       responses: {
         200: { description: 'The updated category', content: categoryContent },
         400: badRequest,
@@ -111,7 +137,8 @@ export const categoryPaths = {
     delete: {
       tags,
       summary: 'Delete a category (admin)',
-      description: 'Fails with 409 while any product, active or not, uses the category.',
+      description:
+        'Fails with 409 while the category has subcategories, or any product, active or not, uses it.',
       security,
       parameters: [categoryId],
       responses: {
@@ -136,23 +163,78 @@ export const categoryParameters = {
   },
 };
 
+const categoryProperties = {
+  id: { type: 'string', format: 'uuid' },
+  parentId: { type: 'string', format: 'uuid', nullable: true },
+  name: { type: 'string', maxLength: 100, example: 'T-Shirts' },
+  imageAssetId: { type: 'string', format: 'uuid', nullable: true },
+  imageUrl: { type: 'string', format: 'uri', nullable: true },
+  createdAt: { type: 'string', format: 'date-time' },
+  updatedAt: { type: 'string', format: 'date-time' },
+};
+
+const categoryRequired = [
+  'id',
+  'parentId',
+  'name',
+  'imageAssetId',
+  'imageUrl',
+  'createdAt',
+  'updatedAt',
+];
+
+const bodyProperties = {
+  name: { type: 'string', minLength: 1, maxLength: 100, example: 'T-Shirts' },
+  parentId: {
+    type: 'string',
+    format: 'uuid',
+    nullable: true,
+    description: 'The parent category, or null for a top-level one',
+  },
+  imageAssetId: {
+    type: 'string',
+    format: 'uuid',
+    nullable: true,
+    description: 'An uploaded asset, or null for no image',
+  },
+};
+
 export const categorySchemas = {
-  Category: {
+  Category: { type: 'object', required: categoryRequired, properties: categoryProperties },
+  CategoryWithPath: {
     type: 'object',
-    required: ['id', 'name', 'createdAt', 'updatedAt'],
+    required: [...categoryRequired, 'path'],
     properties: {
-      id: { type: 'string', format: 'uuid' },
-      name: { type: 'string', maxLength: 100, example: 'T-Shirts' },
-      createdAt: { type: 'string', format: 'date-time' },
-      updatedAt: { type: 'string', format: 'date-time' },
+      ...categoryProperties,
+      path: {
+        type: 'array',
+        description: 'The categories above this one, from the top down',
+        items: {
+          type: 'object',
+          required: ['id', 'name'],
+          properties: { id: { type: 'string', format: 'uuid' }, name: { type: 'string' } },
+        },
+      },
     },
   },
-  CategoryBody: {
+  CategoryNode: {
+    type: 'object',
+    required: [...categoryRequired, 'children'],
+    properties: {
+      ...categoryProperties,
+      children: { type: 'array', items: { $ref: '#/components/schemas/CategoryNode' } },
+    },
+  },
+  CreateCategoryBody: {
     type: 'object',
     required: ['name'],
     additionalProperties: false,
-    properties: {
-      name: { type: 'string', minLength: 1, maxLength: 100, example: 'T-Shirts' },
-    },
+    properties: bodyProperties,
+  },
+  UpdateCategoryBody: {
+    type: 'object',
+    minProperties: 1,
+    additionalProperties: false,
+    properties: bodyProperties,
   },
 };
