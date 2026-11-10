@@ -95,6 +95,7 @@ To use another port, update `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:make-admin -- <email>` | Make an existing user an admin |
 | `npm run postman` | Regenerate the Postman collection |
+| `npm run email:test -- <email>` | Send a test email |
 | `npm run docker:watch` | Run Docker development environment with live reload |
 | `npm run docker:down` | Stop Docker development containers |
 | `npm run test:db` | Start the disposable test database |
@@ -210,6 +211,18 @@ Use the existing Blogs module as a reference.
 5. Apply the migration using `npm run db:migrate`.
 6. Register the module routes in `src/routes/index.ts`.
 7. Document the endpoints in `<name>.openapi.ts` and add its exports to `src/docs/openapi.ts`.
+
+## Email
+
+Development uses [Mailpit](https://mailpit.axllent.org), which catches every email in a local inbox at <http://localhost:8025>, so nothing is really delivered. It starts with `npm run docker:watch`.
+
+To send a test email:
+
+```bash
+npm run email:test -- you@example.com
+```
+
+To send from code, use `sendEmail` from `src/lib/email.ts`. Send after saving your changes, and handle a failure, so that a mail problem never undoes an order. Real email settings are in [docs/deployment.md](docs/deployment.md).
 
 ## Viewing the Database
 

@@ -7,6 +7,8 @@ services:
     environment:
       NODE_ENV: development
       APP_ENV: development
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
     command: sh -c "npm run db:migrate && unset MIGRATION_DATABASE_URL && exec npm run dev"
     develop:
       watch:
@@ -21,6 +23,13 @@ services:
         # Dependency changes need a fresh npm ci.
         - action: rebuild
           path: package-lock.json
+
+  # Catches every email in an inbox at http://localhost:8025, so nothing is really delivered.
+  mailpit:
+    image: axllent/mailpit:v1.33
+    ports:
+      - '127.0.0.1:8025:8025'
+      - '127.0.0.1:1025:1025'
 
   # Database browser at http://localhost:8081, reachable only from this machine.
   adminer:

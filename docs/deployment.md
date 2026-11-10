@@ -119,6 +119,24 @@ POSTGRES_PASSWORD=
 APP_DB_PASSWORD=
 ```
 
+Email is optional, and stays off while `SMTP_HOST` is empty. To send real email, set up your domain with a provider such as Brevo, including its SPF and DKIM records, or messages land in spam. Then add its SMTP details:
+
+```bash
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+EMAIL_FROM="Your Store <orders@your-store.com>"
+```
+
+To check it works:
+
+```bash
+docker compose exec api node dist/lib/send-test-email.js you@example.com
+```
+
+In staging, use a test account or send only to your own addresses, so that customers never get test emails.
+
 ### 7. Start the API
 
 ```bash

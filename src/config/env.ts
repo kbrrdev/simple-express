@@ -14,6 +14,11 @@ interface Env {
   CORS_ORIGINS: string[];
   JWT_SECRET: string;
   PUBLIC_BASE_URL: string;
+  SMTP_HOST?: string;
+  SMTP_PORT: number;
+  SMTP_USER?: string;
+  SMTP_PASSWORD?: string;
+  EMAIL_FROM?: string;
   TAX_RATE_PERCENT: number;
   PRICES_INCLUDE_TAX: boolean;
   SHIPPING_FEE_CENTS: number;
@@ -71,6 +76,13 @@ const envSchema = Joi.object<Env>({
   CORS_ORIGINS: Joi.string().empty('').default([]).custom(parseOrigins),
   JWT_SECRET: Joi.string().min(32).required(),
   PUBLIC_BASE_URL: url.default('http://localhost:3000'),
+  SMTP_HOST: Joi.string().empty(''),
+  SMTP_PORT: Joi.number().port().empty('').default(1025),
+  SMTP_USER: Joi.string().empty(''),
+  SMTP_PASSWORD: Joi.string()
+    .empty('')
+    .when('SMTP_USER', { is: Joi.exist(), then: Joi.required() }),
+  EMAIL_FROM: Joi.string().empty('').when('SMTP_HOST', { is: Joi.exist(), then: Joi.required() }),
   TAX_RATE_PERCENT: Joi.number().min(0).max(100).precision(2).empty('').default(12),
   PRICES_INCLUDE_TAX: Joi.boolean().empty('').default(true),
   SHIPPING_FEE_CENTS: Joi.number().integer().min(0).empty('').default(10000),
