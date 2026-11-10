@@ -362,14 +362,17 @@ describe('getting a product as an admin', () => {
   it('returns inactive products and variants', async () => {
     const product = await createProduct(shirt());
 
-    await asAdmin.delete(`/api/products/${product.id}/variants/${product.variants[0].id}`);
+    const removedId = product.variants[0].id;
+
+    await asAdmin.delete(`/api/products/${product.id}/variants/${removedId}`);
     await asAdmin.delete(`/api/products/${product.id}`).expect(204);
 
     const response = await asAdmin.get(`/api/products/admin/${product.id}`).expect(200);
+    const variants: { id: string; active: boolean }[] = response.body.data.variants;
 
     expect(response.body.data.active).toBe(false);
-    expect(response.body.data.variants).toHaveLength(2);
-    expect(response.body.data.variants[0].active).toBe(false);
+    expect(variants).toHaveLength(2);
+    expect(variants.find((variant) => variant.id === removedId)?.active).toBe(false);
   });
 
   it('returns 404 for an unknown product and 400 for an invalid id', async () => {
