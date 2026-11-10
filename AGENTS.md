@@ -149,6 +149,12 @@ If a simpler solution works just as well, choose the simpler solution.
 - Use only free tools and services. Do not use paid products or free trials.
 - Prefer open-source packages with permissive licenses, such as MIT or Apache-2.0.
 
+## Planning First
+
+- Treat every request as planning, even when it sounds like an instruction to build.
+- Do not create or change anything until the user says "go execute". Reading files and running read-only checks are fine.
+- Each "go execute" covers only the work just planned. New work goes back to planning.
+
 ## Git and Project Changes
 
 - Before starting new changes, ask whether to commit the current work.
