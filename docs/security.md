@@ -23,7 +23,7 @@ The tools used to find problems are described in [security-tools.md](security-to
 | 13  | Stock could be held for free           | High          | Fixed, with a note |
 | 14  | Secrets in error logs                  | High          | Fixed              |
 | 15  | Draft blogs were public                | Medium        | Fixed              |
-| 16  | Admin login has no second factor       | High          | Open               |
+| 16  | Admin login has no second factor       | High          | Open, deferred     |
 | 17  | Guest links never expire               | Medium        | Fixed, with a note |
 | 18  | No automatic checks on GitHub          | Medium        | Fixed, with a note |
 | 19  | Large order totals failed              | Low           | Fixed              |
@@ -140,7 +140,15 @@ The API could be reached directly, skipping the proxy and HTTPS, as Docker can b
 
 **Risk:** a stolen admin password gives full control of products, orders, and customer data.
 
-**Plan:** add two-factor login for admins. Until then, use a long, unique password, and only make admins who need it.
+**Plan:** deferred for now. Until it is built, use a long, unique password, and only make admins who need it. When it is built:
+
+- Use 6-digit authenticator app codes (TOTP), written with Node's `crypto` module and tested against the RFC 6238 examples.
+- Any user can turn it on, and `requireAdmin` returns `403` until an admin has.
+- Login returns a 5-minute challenge token instead of tokens, and `POST /api/auth/login/verify` takes it with a code. Wrong codes count as failed logins.
+- `/api/auth/2fa/setup`, `/enable`, and `/disable` manage it. Enabling ends the other sessions, and disabling needs the password and a code.
+- Enabling returns 10 single-use recovery codes, of which only hashes are stored.
+- Store the time step of the last accepted code, so that a code cannot be replayed.
+- Encrypt the secret with AES-256-GCM and a new `TOTP_ENCRYPTION_KEY`, so that a copy of the database alone cannot pass it.
 
 ## Later
 
