@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { logRateLimit } from '../../middleware/rate-limit';
-import { requireAdmin, requireAuth } from '../../middleware/require-auth';
+import { requireAuth, requirePermission } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import { cartItemsBody } from '../cart/cart.validation';
 import * as controller from './order.controller';
@@ -61,21 +61,21 @@ orderRoutes.post(
 orderRoutes.get(
   '/admin',
   requireAuth,
-  requireAdmin,
+  requirePermission('orders.view'),
   validate('query', listAllOrdersQuery),
   controller.listForAdmin,
 );
 orderRoutes.get(
   '/admin/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('orders.view'),
   validate('params', orderParams),
   controller.getForAdmin,
 );
 orderRoutes.patch(
   '/admin/:id/status',
   requireAuth,
-  requireAdmin,
+  requirePermission('orders.manage'),
   validate('params', orderParams),
   validate('body', updateOrderStatusBody),
   controller.updateStatus,
@@ -84,21 +84,21 @@ orderRoutes.patch(
 orderRoutes.post(
   '/admin/:id/payment/confirm',
   requireAuth,
-  requireAdmin,
+  requirePermission('orders.manage'),
   validate('params', orderParams),
   controller.confirmPayment,
 );
 orderRoutes.post(
   '/admin/:id/payment/reject',
   requireAuth,
-  requireAdmin,
+  requirePermission('orders.manage'),
   validate('params', orderParams),
   controller.rejectPayment,
 );
 orderRoutes.post(
   '/admin/:id/payment/refund',
   requireAuth,
-  requireAdmin,
+  requirePermission('orders.refund'),
   validate('params', orderParams),
   controller.refundPayment,
 );

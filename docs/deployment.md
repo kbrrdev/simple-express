@@ -147,13 +147,15 @@ docker compose logs -f api
 
 Migrations run when the API starts.
 
-### 8. Create the First Admin
+### 8. Create the First Super Admin
 
 Register a user through the API, then:
 
 ```bash
-docker compose exec api node dist/db/make-admin.js you@your-store.com
+docker compose exec api node dist/db/set-role.js you@your-store.com "Super admin"
 ```
+
+The super admin then gives other staff their roles through `PATCH /api/users/:id/role`.
 
 Use a long, unique password, as admin logins have no second factor yet.
 

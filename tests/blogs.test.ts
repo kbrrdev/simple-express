@@ -3,7 +3,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { db, pool } from '../src/db';
-import { blogs, users } from '../src/db/schema';
+import { blogs, SUPER_ADMIN_ROLE_ID, users } from '../src/db/schema';
 
 const password = 'correct-horse-battery';
 const blog = { title: 'Hello', content: 'First post', author: 'Jane', published: true };
@@ -35,7 +35,10 @@ beforeAll(async () => {
   await db.execute(sql`truncate table users, sessions cascade`);
 
   adminToken = await registerAndLogin('admin@example.com');
-  await db.update(users).set({ role: 'admin' }).where(eq(users.email, 'admin@example.com'));
+  await db
+    .update(users)
+    .set({ roleId: SUPER_ADMIN_ROLE_ID })
+    .where(eq(users.email, 'admin@example.com'));
   customerToken = await registerAndLogin('customer@example.com');
 });
 
@@ -70,7 +73,7 @@ describe('blogs', () => {
     const response = await api().post('/api/blogs').set(bearer(customerToken)).send(blog);
 
     expect(response.status).toBe(403);
-    expect(response.body).toEqual({ error: { message: 'Admin access required' } });
+    expect(response.body).toEqual({ error: { message: 'You do not have permission to do this' } });
     await api().patch(path).set(bearer(customerToken)).send({ title: 'Changed' }).expect(403);
     await api().delete(path).set(bearer(customerToken)).expect(403);
 

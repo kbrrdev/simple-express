@@ -3,7 +3,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { db, pool } from '../src/db';
-import { products, productVariants, users } from '../src/db/schema';
+import { products, productVariants, SUPER_ADMIN_ROLE_ID, users } from '../src/db/schema';
 
 const admin = { email: 'admin@example.com', password: 'correct-horse-battery' };
 const customer = { email: 'customer@example.com', password: 'correct-horse-battery' };
@@ -55,7 +55,7 @@ beforeAll(async () => {
   await db.execute(sql`truncate table users, sessions cascade`);
 
   await registerAndLogin(admin);
-  await db.update(users).set({ role: 'admin' }).where(eq(users.email, admin.email));
+  await db.update(users).set({ roleId: SUPER_ADMIN_ROLE_ID }).where(eq(users.email, admin.email));
   adminToken = (
     await api()
       .post('/api/auth/login')

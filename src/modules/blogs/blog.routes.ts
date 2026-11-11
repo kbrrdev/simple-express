@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin, requireAuth } from '../../middleware/require-auth';
+import { requireAuth, requirePermission } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './blog.controller';
 import {
@@ -16,7 +16,7 @@ blogRoutes.get('/', validate('query', listBlogsQuery), controller.list);
 blogRoutes.post(
   '/',
   requireAuth,
-  requireAdmin,
+  requirePermission('blogs.manage'),
   validate('body', createBlogBody),
   controller.create,
 );
@@ -24,14 +24,14 @@ blogRoutes.post(
 blogRoutes.get(
   '/admin',
   requireAuth,
-  requireAdmin,
+  requirePermission('blogs.manage'),
   validate('query', listAllBlogsQuery),
   controller.listForAdmin,
 );
 blogRoutes.get(
   '/admin/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('blogs.manage'),
   validate('params', blogParams),
   controller.getForAdmin,
 );
@@ -39,7 +39,7 @@ blogRoutes.get('/:id', validate('params', blogParams), controller.get);
 blogRoutes.patch(
   '/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('blogs.manage'),
   validate('params', blogParams),
   validate('body', updateBlogBody),
   controller.update,
@@ -47,7 +47,7 @@ blogRoutes.patch(
 blogRoutes.delete(
   '/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('blogs.manage'),
   validate('params', blogParams),
   controller.remove,
 );

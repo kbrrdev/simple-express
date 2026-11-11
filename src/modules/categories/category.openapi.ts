@@ -61,7 +61,7 @@ export const categoryPaths = {
     },
     post: {
       tags,
-      summary: 'Create a category (admin)',
+      summary: 'Create a category (needs categories.manage)',
       security,
       description: `Categories can be up to ${MAX_CATEGORY_DEPTH} levels deep. Names must be unique among categories with the same parent.`,
       requestBody: bodyOf('CreateCategoryBody'),
@@ -118,7 +118,7 @@ export const categoryPaths = {
     },
     patch: {
       tags,
-      summary: 'Update or move a category (admin)',
+      summary: 'Update or move a category (needs categories.manage)',
       description:
         'A new `parentId` moves the category with everything below it, and `null` makes it top-level. A move into its own subtree, or deeper than the limit, returns 400.',
       security,
@@ -136,7 +136,7 @@ export const categoryPaths = {
     },
     delete: {
       tags,
-      summary: 'Delete a category (admin)',
+      summary: 'Delete a category (needs categories.manage)',
       description:
         'Fails with 409 while the category has subcategories, or any product, active or not, uses it.',
       security,

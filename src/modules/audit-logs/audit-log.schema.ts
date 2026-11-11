@@ -9,6 +9,7 @@ export const auditEntityTypes = [
   'payment_method',
   'product',
   'product_image',
+  'role',
   'user',
   'variant',
 ] as const;

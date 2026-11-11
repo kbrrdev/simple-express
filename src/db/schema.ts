@@ -8,3 +8,4 @@ export * from '../modules/categories/category.schema';
 export * from '../modules/orders/order.schema';
 export * from '../modules/payment-methods/payment-method.schema';
 export * from '../modules/products/product.schema';
+export * from '../modules/roles/role.schema';

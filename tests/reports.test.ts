@@ -4,7 +4,15 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { db, pool } from '../src/db';
-import { categories, orderItems, orders, products, productVariants, users } from '../src/db/schema';
+import {
+  categories,
+  orderItems,
+  orders,
+  products,
+  productVariants,
+  SUPER_ADMIN_ROLE_ID,
+  users,
+} from '../src/db/schema';
 
 const password = 'correct-horse-battery';
 const march = { from: '2026-03-01', to: '2026-03-31' };
@@ -88,7 +96,10 @@ beforeAll(async () => {
   await db.execute(sql`truncate table users, sessions, categories, orders cascade`);
 
   adminToken = await registerAndLogin('admin@example.com');
-  await db.update(users).set({ role: 'admin' }).where(eq(users.email, 'admin@example.com'));
+  await db
+    .update(users)
+    .set({ roleId: SUPER_ADMIN_ROLE_ID })
+    .where(eq(users.email, 'admin@example.com'));
   customerToken = await registerAndLogin('customer@example.com');
   const [customer] = await db.select().from(users).where(eq(users.email, 'customer@example.com'));
   if (!customer) throw new Error('Failed to find customer');

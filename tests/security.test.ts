@@ -67,7 +67,7 @@ describe('error logs', () => {
       await db.insert(users).values({
         email: 'secret-person@example.com',
         passwordHash: 'SECRET-HASH-VALUE',
-        role: 'nope' as 'admin',
+        roleId: 'nope',
       });
     } catch (error) {
       return error;

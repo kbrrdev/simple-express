@@ -1,21 +1,12 @@
-import {
-  index,
-  integer,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
-
-export const userRole = pgEnum('user_role', ['customer', 'admin']);
+import { index, integer, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { roles } from '../roles/role.schema';
 
 export const users = pgTable('users', {
   id: uuid().primaryKey().defaultRandom(),
   email: varchar({ length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  role: userRole().notNull().default('customer'),
+  // Customers have no role. Staff roles are managed by super admins.
+  roleId: uuid('role_id').references(() => roles.id, { onDelete: 'restrict' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()

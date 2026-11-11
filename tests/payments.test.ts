@@ -12,6 +12,7 @@ import {
   payments,
   products,
   productVariants,
+  SUPER_ADMIN_ROLE_ID,
   users,
 } from '../src/db/schema';
 import { guestOrderLimiter } from '../src/modules/orders/order.routes';
@@ -136,7 +137,10 @@ beforeAll(async () => {
   await db.execute(sql`truncate table users, sessions cascade`);
 
   adminToken = await registerAndLogin('admin@example.com');
-  await db.update(users).set({ role: 'admin' }).where(eq(users.email, 'admin@example.com'));
+  await db
+    .update(users)
+    .set({ roleId: SUPER_ADMIN_ROLE_ID })
+    .where(eq(users.email, 'admin@example.com'));
   token = await registerAndLogin('customer@example.com');
   otherToken = await registerAndLogin('other@example.com');
 });

@@ -425,7 +425,7 @@
           }
         },
         {
-          "name": "Create a blog (admin)",
+          "name": "Create a blog (needs blogs.manage)",
           "event": [
             {
               "listen": "test",
@@ -468,7 +468,7 @@
           }
         },
         {
-          "name": "List all blogs, including drafts (admin)",
+          "name": "List all blogs, including drafts (needs blogs.manage)",
           "request": {
             "method": "GET",
             "header": [],
@@ -504,7 +504,7 @@
           }
         },
         {
-          "name": "Get any blog, including drafts (admin)",
+          "name": "Get any blog, including drafts (needs blogs.manage)",
           "request": {
             "method": "GET",
             "header": [],
@@ -558,7 +558,7 @@
           }
         },
         {
-          "name": "Update a blog (admin)",
+          "name": "Update a blog (needs blogs.manage)",
           "request": {
             "method": "PATCH",
             "header": [],
@@ -592,7 +592,7 @@
           }
         },
         {
-          "name": "Delete a blog (admin)",
+          "name": "Delete a blog (needs blogs.manage)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -655,7 +655,7 @@
           }
         },
         {
-          "name": "Create a category (admin)",
+          "name": "Create a category (needs categories.manage)",
           "event": [
             {
               "listen": "test",
@@ -750,7 +750,7 @@
           }
         },
         {
-          "name": "Update or move a category (admin)",
+          "name": "Update or move a category (needs categories.manage)",
           "request": {
             "method": "PATCH",
             "description": "A new `parentId` moves the category with everything below it, and `null` makes it top-level. A move into its own subtree, or deeper than the limit, returns 400.",
@@ -785,7 +785,7 @@
           }
         },
         {
-          "name": "Delete a category (admin)",
+          "name": "Delete a category (needs categories.manage)",
           "request": {
             "method": "DELETE",
             "description": "Fails with 409 while the category has subcategories, or any product, active or not, uses it.",
@@ -865,7 +865,7 @@
           }
         },
         {
-          "name": "Create a product and its variants (admin)",
+          "name": "Create a product and its variants (needs products.manage)",
           "event": [
             {
               "listen": "test",
@@ -908,7 +908,7 @@
           }
         },
         {
-          "name": "List all products, including inactive ones (admin)",
+          "name": "List all products, including inactive ones (needs products.view)",
           "request": {
             "method": "GET",
             "header": [],
@@ -954,7 +954,7 @@
           }
         },
         {
-          "name": "Get any product, including inactive ones and their variants (admin)",
+          "name": "Get any product, including inactive ones and their variants (needs products.view)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1008,7 +1008,7 @@
           }
         },
         {
-          "name": "Update a product (admin)",
+          "name": "Update a product (needs products.manage)",
           "request": {
             "method": "PATCH",
             "description": "Existing options can be renamed, but options cannot be added.",
@@ -1043,7 +1043,7 @@
           }
         },
         {
-          "name": "Deactivate a product (admin)",
+          "name": "Deactivate a product (needs products.manage)",
           "request": {
             "method": "DELETE",
             "description": "The product is kept, and can be restored by setting `active` to true.",
@@ -1069,7 +1069,7 @@
           }
         },
         {
-          "name": "Add an uploaded asset to a product (admin)",
+          "name": "Add an uploaded asset to a product (needs products.manage)",
           "event": [
             {
               "listen": "test",
@@ -1120,7 +1120,7 @@
           }
         },
         {
-          "name": "Change the alt text or position of an image (admin)",
+          "name": "Change the alt text or position of an image (needs products.manage)",
           "request": {
             "method": "PATCH",
             "header": [],
@@ -1160,7 +1160,7 @@
           }
         },
         {
-          "name": "Remove an image from a product (admin)",
+          "name": "Remove an image from a product (needs products.manage)",
           "request": {
             "method": "DELETE",
             "description": "The uploaded file is kept. Fails with 409 while a variant uses the image.",
@@ -1192,7 +1192,7 @@
           }
         },
         {
-          "name": "Add a variant (admin)",
+          "name": "Add a variant (needs products.manage)",
           "event": [
             {
               "listen": "test",
@@ -1242,7 +1242,7 @@
           }
         },
         {
-          "name": "Update a variant (admin)",
+          "name": "Update a variant (needs products.manage or, for stock only, inventory.manage)",
           "request": {
             "method": "PATCH",
             "header": [],
@@ -1282,7 +1282,7 @@
           }
         },
         {
-          "name": "Deactivate a variant (admin)",
+          "name": "Deactivate a variant (needs products.manage)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -1539,7 +1539,7 @@
           }
         },
         {
-          "name": "Add a payment method (admin)",
+          "name": "Add a payment method (needs payment_methods.manage)",
           "event": [
             {
               "listen": "test",
@@ -1583,7 +1583,7 @@
           }
         },
         {
-          "name": "List all payment methods with account details (admin)",
+          "name": "List all payment methods with account details (needs payment_methods.manage)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1603,7 +1603,7 @@
           }
         },
         {
-          "name": "Update a payment method (admin)",
+          "name": "Update a payment method (needs payment_methods.manage)",
           "request": {
             "method": "PATCH",
             "description": "Orders already placed keep the details they were given.",
@@ -1638,7 +1638,7 @@
           }
         },
         {
-          "name": "Delete a payment method (admin)",
+          "name": "Delete a payment method (needs payment_methods.manage)",
           "request": {
             "method": "DELETE",
             "description": "Fails with 409 once orders use it. Set enabled to false instead.",
@@ -1908,7 +1908,7 @@
           }
         },
         {
-          "name": "List all orders (admin)",
+          "name": "List all orders (needs orders.view)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1949,7 +1949,7 @@
           }
         },
         {
-          "name": "Get any order (admin)",
+          "name": "Get any order (needs orders.view)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1975,7 +1975,7 @@
           }
         },
         {
-          "name": "Move an order to its next status (admin)",
+          "name": "Move an order to its next status (needs orders.manage)",
           "request": {
             "method": "PATCH",
             "description": "Allowed moves: pending to confirmed or cancelled, confirmed to shipped or cancelled, and shipped to delivered or returned. Cancelling returns stock. Returning does not, as the item may be damaged. Delivering a COD order marks it paid.",
@@ -2012,7 +2012,7 @@
           }
         },
         {
-          "name": "Confirm a submitted payment (admin)",
+          "name": "Confirm a submitted payment (needs orders.manage)",
           "request": {
             "method": "POST",
             "description": "Marks the order paid and moves it to pending.",
@@ -2041,7 +2041,7 @@
           }
         },
         {
-          "name": "Reject a submitted payment (admin)",
+          "name": "Reject a submitted payment (needs orders.manage)",
           "request": {
             "method": "POST",
             "description": "Cancels the order and returns its stock.",
@@ -2070,7 +2070,7 @@
           }
         },
         {
-          "name": "Record a refund (admin)",
+          "name": "Record a refund (needs orders.refund)",
           "request": {
             "method": "POST",
             "description": "Records a refund made outside the system. The order must be cancelled, returned, or delivered.",
@@ -2371,7 +2371,7 @@
       "name": "Assets",
       "item": [
         {
-          "name": "List uploaded files, newest first (admin)",
+          "name": "List uploaded files, newest first (needs assets.manage)",
           "request": {
             "method": "GET",
             "header": [],
@@ -2401,7 +2401,7 @@
           }
         },
         {
-          "name": "Upload an image (admin)",
+          "name": "Upload an image (needs assets.manage)",
           "event": [
             {
               "listen": "test",
@@ -2446,7 +2446,7 @@
           }
         },
         {
-          "name": "Delete an uploaded file (admin)",
+          "name": "Delete an uploaded file (needs assets.manage)",
           "request": {
             "method": "DELETE",
             "description": "Fails with 409 while a product or blog uses the asset.",
@@ -2477,7 +2477,7 @@
       "name": "Reports",
       "item": [
         {
-          "name": "Get sales totals for a date range (admin)",
+          "name": "Get sales totals for a date range (needs reports.sales)",
           "request": {
             "method": "GET",
             "description": "Days follow Manila time, and both dates are included. Without dates, it covers the last 30 days. Totals use the amounts saved on each order, so changing the tax rate never changes past figures.",
@@ -2509,7 +2509,7 @@
           }
         },
         {
-          "name": "Get sales per day, week, or month, for a chart (admin)",
+          "name": "Get sales per day, week, or month, for a chart (needs reports.sales)",
           "request": {
             "method": "GET",
             "description": "Returns a point for every period, including empty ones. Weeks start on Monday, and each point is dated by the first day of its period. A daily report can cover up to 366 days.",
@@ -2546,7 +2546,7 @@
           }
         },
         {
-          "name": "Get the best-selling products (admin)",
+          "name": "Get the best-selling products (needs reports.sales)",
           "request": {
             "method": "GET",
             "description": "Counts orders placed in the range, apart from cancelled ones. Variants are combined into their product, and inactive products are included.",
@@ -2588,7 +2588,7 @@
           }
         },
         {
-          "name": "Count orders by status, and what needs doing (admin)",
+          "name": "Count orders by status, and what needs doing (needs reports.operations)",
           "request": {
             "method": "GET",
             "description": "Shows every order as it is now, with no date range.",
@@ -2609,7 +2609,7 @@
           }
         },
         {
-          "name": "List variants that are running out (admin)",
+          "name": "List variants that are running out (needs reports.operations)",
           "request": {
             "method": "GET",
             "description": "Only variants on sale are listed, lowest stock first.",
@@ -2651,7 +2651,7 @@
       "name": "Audit Logs",
       "item": [
         {
-          "name": "List changes made by admins and to accounts, newest first (admin)",
+          "name": "List changes made by admins and to accounts, newest first (needs audit_logs.view)",
           "request": {
             "method": "GET",
             "description": "Records admin changes to products, variants, images, categories, blogs, payment methods, files, and orders, and changes to passwords, sessions, and roles. Entries cannot be edited or deleted. Dates follow Manila time, and both are included.",
@@ -2708,6 +2708,204 @@
                 }
               ],
               "variable": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "item": [
+        {
+          "name": "List every permission, for the role editor (super admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles/permissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles",
+                "permissions"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "List roles (super admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Create a role (super admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Content Editor\",\n  \"description\": \"Writes blogs\",\n  \"permissions\": [\n    \"blogs.manage\",\n    \"assets.manage\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get a role (super admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{undefined}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rename a role or change its permissions (super admin)",
+          "request": {
+            "method": "PATCH",
+            "description": "Sending `permissions` replaces the whole list. Users with the role get the new permissions on their next request. The Super admin role cannot be changed.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{undefined}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"blogs.manage\",\n    \"assets.manage\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a role that no user has (super admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{undefined}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Change a user's role (super admin)",
+          "request": {
+            "method": "PATCH",
+            "description": "Send `roleId: null` to make the user a customer. Super admins cannot change their own role, so the store always keeps one. The change applies on the next request.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/:id/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                ":id",
+                "role"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{undefined}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleId\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         }
