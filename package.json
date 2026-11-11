@@ -20,6 +20,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "db:make-admin": "tsx src/db/make-admin.ts",
+    "db:seed": "tsx src/db/seed.ts",
     "postman": "tsx src/docs/generate-postman.ts",
     "email:test": "tsx src/lib/send-test-email.ts",
     "docker:watch": "docker compose -f docker-compose.yml -f docker-compose.dev.yml watch",
