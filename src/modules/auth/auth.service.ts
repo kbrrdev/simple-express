@@ -16,7 +16,7 @@ import { sendEmail } from '../../lib/email';
 import { logger } from '../../lib/logger';
 import { recordAudit } from '../audit-logs/audit-log.service';
 import { resolvePermissions, type Permission } from '../roles/permissions';
-import { roles } from '../roles/role.schema';
+import { roles, SUPER_ADMIN_ROLE_ID } from '../roles/role.schema';
 import { loginAttempts, passwordResets, sessions, users } from './auth.schema';
 import type { ChangePasswordBody, RegisterBody, ResetPasswordBody } from './auth.validation';
 
@@ -110,7 +110,7 @@ export async function register({ email, password }: RegisterBody) {
     .returning(publicUser);
 
   if (!user) throw new AppError(409, 'Email is already registered');
-  return { ...user, role: null, permissions: [] };
+  return { ...user, role: null, superAdmin: false, permissions: [] };
 }
 
 async function assertLoginAllowed(email: string) {
@@ -474,6 +474,8 @@ export async function getUser(userId: string) {
   return {
     ...rest,
     role: roleId && roleName ? { id: roleId, name: roleName } : null,
+    // Admin can hold every permission too, so this is what tells a super admin apart.
+    superAdmin: roleId === SUPER_ADMIN_ROLE_ID,
     permissions: resolvePermissions(roleId, granted),
   };
 }

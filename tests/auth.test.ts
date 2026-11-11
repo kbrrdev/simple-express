@@ -85,13 +85,11 @@ describe('roles', () => {
   });
 
   it('does not let a user choose their role when registering', async () => {
-    const response = await api()
-      .post('/api/auth/register')
-      .send({
-        email: 'sneaky@example.com',
-        password: 'another-password',
-        roleId: SUPER_ADMIN_ROLE_ID,
-      });
+    const response = await api().post('/api/auth/register').send({
+      email: 'sneaky@example.com',
+      password: 'another-password',
+      roleId: SUPER_ADMIN_ROLE_ID,
+    });
 
     expect(response.status).toBe(400);
   });
@@ -154,6 +152,7 @@ describe('register', () => {
       'id',
       'permissions',
       'role',
+      'superAdmin',
     ]);
   });
 
