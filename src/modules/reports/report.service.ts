@@ -54,12 +54,14 @@ function resolveRange({ from, to }: DateRangeQuery): DateRange {
   return { from: start, to: end };
 }
 
+/** When a day starts in store time. `days` moves it, so 1 gives the start of the next day. */
+export function startOfStoreDay(date: string, days = 0) {
+  return sql`(${date}::date + ${days}::int)::timestamp at time zone ${STORE_TIME_ZONE}`;
+}
+
 /** Matches times from the start of `from` to the end of `to`, in store time. */
 function inRange(column: AnyColumn, { from, to }: DateRange) {
-  return and(
-    gte(column, sql`(${from}::date)::timestamp at time zone ${STORE_TIME_ZONE}`),
-    lt(column, sql`(${to}::date + 1)::timestamp at time zone ${STORE_TIME_ZONE}`),
-  );
+  return and(gte(column, startOfStoreDay(from)), lt(column, startOfStoreDay(to, 1)));
 }
 
 /** Sums a column, only over rows that match `where` when given. Postgres returns sums as text. */

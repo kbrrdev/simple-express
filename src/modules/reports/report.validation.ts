@@ -21,7 +21,7 @@ export interface LowStockQuery {
 }
 
 // A calendar day in the store's time zone, such as 2026-03-01.
-const date = Joi.string()
+export const storeDate = Joi.string()
   .pattern(/^\d{4}-\d{2}-\d{2}$/)
   // Rejects days that do not exist, such as 2026-02-30, which Date would roll into March.
   .custom((value: string, helpers) => {
@@ -32,8 +32,8 @@ const date = Joi.string()
   .messages({ 'string.pattern.base': '{{#label}} must be a date such as 2026-03-01' });
 
 const dateRange = {
-  from: date,
-  to: date,
+  from: storeDate,
+  to: storeDate,
 };
 
 export const dateRangeQuery = Joi.object<DateRangeQuery>(dateRange);

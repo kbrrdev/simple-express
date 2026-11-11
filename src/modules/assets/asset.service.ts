@@ -6,8 +6,11 @@ import { FOREIGN_KEY_VIOLATION, hasDbErrorCode } from '../../lib/db-errors';
 import { logger } from '../../lib/logger';
 import { recordStep } from '../../lib/request-context';
 import { deleteFile, fileUrl, saveFile } from '../../lib/storage';
+import { changesBetween, recordAudit } from '../audit-logs/audit-log.service';
 import { assets, type Asset } from './asset.schema';
 import type { ListAssetsQuery } from './asset.validation';
+
+const ASSET_FIELDS = ['path', 'mimeType', 'sizeBytes'];
 
 /** Reads the file's first bytes, as its name and declared type can be faked. */
 function detectImageType(file: Buffer) {
@@ -59,11 +62,22 @@ export async function createAsset(file: Buffer) {
   recordStep('File saved');
 
   try {
-    const [asset] = await db
-      .insert(assets)
-      .values({ path, mimeType: type.mimeType, sizeBytes: file.length })
-      .returning();
-    if (!asset) throw new AppError(500, 'Failed to create asset');
+    const asset = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(assets)
+        .values({ path, mimeType: type.mimeType, sizeBytes: file.length })
+        .returning();
+      if (!created) throw new AppError(500, 'Failed to create asset');
+
+      await recordAudit(tx, {
+        entityType: 'asset',
+        entityId: created.id,
+        action: 'create',
+        changes: changesBetween({}, created, ASSET_FIELDS),
+      });
+
+      return created;
+    });
 
     logger.info({ assetId: asset.id, sizeBytes: asset.sizeBytes }, 'File uploaded');
 
@@ -77,12 +91,19 @@ export async function createAsset(file: Buffer) {
 export async function deleteAsset(id: string): Promise<void> {
   // The row goes first, so that a file still in use is never removed.
   try {
-    const [asset] = await db
-      .delete(assets)
-      .where(eq(assets.id, id))
-      .returning({ path: assets.path });
+    const asset = await db.transaction(async (tx) => {
+      const [deleted] = await tx.delete(assets).where(eq(assets.id, id)).returning();
+      if (!deleted) throw new AppError(404, `Asset not found: ${id}`);
 
-    if (!asset) throw new AppError(404, `Asset not found: ${id}`);
+      await recordAudit(tx, {
+        entityType: 'asset',
+        entityId: id,
+        action: 'delete',
+        changes: changesBetween(deleted, {}, ASSET_FIELDS),
+      });
+
+      return deleted;
+    });
 
     recordStep('Asset row deleted');
     await deleteFile(asset.path);

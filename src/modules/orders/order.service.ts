@@ -22,6 +22,7 @@ import { recordStep } from '../../lib/request-context';
 import { fileUrl } from '../../lib/storage';
 import { addresses } from '../addresses/address.schema';
 import { assets } from '../assets/asset.schema';
+import { changesBetween, recordAudit } from '../audit-logs/audit-log.service';
 import { users } from '../auth/auth.schema';
 import { cartItems } from '../cart/cart.schema';
 import { previewCart } from '../cart/cart.service';
@@ -492,6 +493,7 @@ export async function confirmPayment(id: string) {
     }
 
     await markPaid(tx, id);
+    await auditOrderChange(tx, order, 'payment_confirm');
     logger.info({ orderId: id, totalCents: order.totalCents }, 'Payment confirmed');
   });
 
@@ -505,6 +507,7 @@ export async function rejectPayment(id: string) {
     }
 
     await cancelOrder(tx, order);
+    await auditOrderChange(tx, order, 'payment_reject');
     logger.info({ orderId: id, totalCents: order.totalCents }, 'Payment rejected');
   });
 
@@ -523,6 +526,7 @@ export async function refundPayment(id: string) {
     }
 
     await tx.update(orders).set({ paymentStatus: 'refunded' }).where(eq(orders.id, id));
+    await auditOrderChange(tx, order, 'refund');
     logger.info({ orderId: id, totalCents: order.totalCents }, 'Refund recorded');
   });
 
@@ -649,17 +653,18 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
 
     if (status === 'cancelled') {
       await cancelOrder(tx, order);
-      return;
+    } else {
+      // Returned stock is left alone, as the item may be damaged. Admins add it back by hand.
+      await tx.update(orders).set({ status }).where(eq(orders.id, id));
+      logger.info({ orderId: id, from: order.status, to: status }, 'Order status changed');
+
+      // Delivering a COD order means the customer has handed the cash to the courier.
+      if (status === 'delivered' && order.paymentType === 'cod') {
+        await markPaid(tx, id);
+      }
     }
 
-    // Returned stock is left alone, as the item may be damaged. Admins add it back by hand.
-    await tx.update(orders).set({ status }).where(eq(orders.id, id));
-    logger.info({ orderId: id, from: order.status, to: status }, 'Order status changed');
-
-    // Delivering a COD order means the customer has handed the cash to the courier.
-    if (status === 'delivered' && order.paymentType === 'cod') {
-      await markPaid(tx, id);
-    }
+    await auditOrderChange(tx, order, 'status_change');
   });
 
   return getAnyOrder(id);
@@ -694,6 +699,18 @@ function lockOrder<T>(
     const [order] = await tx.select().from(orders).where(where).for('update');
 
     return order ? work(tx, order) : notFound(id);
+  });
+}
+
+/** Records how an admin action changed the order, read back after every update has run. */
+async function auditOrderChange(tx: Transaction, before: Order, action: string) {
+  const [after] = await tx.select().from(orders).where(eq(orders.id, before.id));
+
+  await recordAudit(tx, {
+    entityType: 'order',
+    entityId: before.id,
+    action,
+    changes: changesBetween(before, after ?? {}, ['status', 'paymentStatus']),
   });
 }
 

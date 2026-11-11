@@ -23,6 +23,8 @@ async function grantAppRole(migrationUrl: string) {
   await pool.query(
     `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${escapeIdentifier(role)}`,
   );
+  // The history of changes can be added to, but never rewritten, even by a bug in the API.
+  await pool.query(`REVOKE UPDATE, DELETE ON audit_logs FROM ${escapeIdentifier(role)}`);
 }
 
 async function main() {

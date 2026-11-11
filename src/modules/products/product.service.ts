@@ -5,6 +5,7 @@ import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../l
 import { logger } from '../../lib/logger';
 import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
+import { changesBetween, recordAudit, type AuditEntry } from '../audit-logs/audit-log.service';
 import { findCategoryAndDescendantIds } from '../categories/category.service';
 import {
   productImages,
@@ -23,10 +24,21 @@ import type {
   VariantBody,
 } from './product.validation';
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type OptionNames = { option1Name?: string | null; option2Name?: string | null };
 type OptionValues = { option1Value?: string | null; option2Value?: string | null };
 
 const MAX_IMAGES_PER_PRODUCT = 10;
+const PRODUCT_FIELDS = [
+  'categoryId',
+  'name',
+  'description',
+  'option1Name',
+  'option2Name',
+  'active',
+];
+const VARIANT_FIELDS = ['option1Value', 'option2Value', 'priceCents', 'stock', 'active', 'assetId'];
+const IMAGE_FIELDS = ['assetId', 'altText', 'position'];
 
 // A product with nothing left to buy is hidden, as if the product itself were inactive.
 const isPublic = and(
@@ -112,6 +124,24 @@ export async function createProduct({ variants, ...data }: CreateProductBody) {
         .values(variants.map((variant) => ({ ...variant, productId: product.id })))
         .returning();
 
+      const variantEntries = created.map((variant): AuditEntry => ({
+        entityType: 'variant',
+        entityId: variant.id,
+        action: 'create',
+        changes: changesBetween({}, variant, VARIANT_FIELDS),
+      }));
+
+      await recordAudit(
+        tx,
+        {
+          entityType: 'product',
+          entityId: product.id,
+          action: 'create',
+          changes: changesBetween({}, product, PRODUCT_FIELDS),
+        },
+        ...variantEntries,
+      );
+
       return { ...product, images: [], variants: created };
     });
   } catch (error) {
@@ -120,15 +150,29 @@ export async function createProduct({ variants, ...data }: CreateProductBody) {
 }
 
 export async function updateProduct(id: string, data: UpdateProductBody) {
-  const existing = await findProduct(id);
-
-  if ((data.option1Name && !existing.option1Name) || (data.option2Name && !existing.option2Name)) {
-    throw new AppError(409, 'Options cannot be added after a product is created');
-  }
-
   try {
-    const [product] = await db.update(products).set(data).where(eq(products.id, id)).returning();
-    if (!product) notFound(id);
+    const product = await db.transaction(async (tx) => {
+      const existing = await lockProduct(tx, id);
+
+      if (
+        (data.option1Name && !existing.option1Name) ||
+        (data.option2Name && !existing.option2Name)
+      ) {
+        throw new AppError(409, 'Options cannot be added after a product is created');
+      }
+
+      const [updated] = await tx.update(products).set(data).where(eq(products.id, id)).returning();
+      if (!updated) notFound(id);
+
+      await recordAudit(tx, {
+        entityType: 'product',
+        entityId: id,
+        action: 'update',
+        changes: changesBetween(existing, updated, Object.keys(data)),
+      });
+
+      return updated;
+    });
 
     const [variants, images] = await Promise.all([findVariants([id], true), findImages([id])]);
 
@@ -139,13 +183,17 @@ export async function updateProduct(id: string, data: UpdateProductBody) {
 }
 
 export async function deactivateProduct(id: string): Promise<void> {
-  const [product] = await db
-    .update(products)
-    .set({ active: false })
-    .where(eq(products.id, id))
-    .returning({ id: products.id });
+  await db.transaction(async (tx) => {
+    const existing = await lockProduct(tx, id);
 
-  if (!product) notFound(id);
+    await tx.update(products).set({ active: false }).where(eq(products.id, id));
+    await recordAudit(tx, {
+      entityType: 'product',
+      entityId: id,
+      action: 'deactivate',
+      changes: changesBetween(existing, { active: false }, ['active']),
+    });
+  });
 
   logger.info({ productId: id }, 'Product deactivated');
 }
@@ -155,12 +203,22 @@ export async function addVariant(productId: string, data: VariantBody): Promise<
   assertValuesMatchOptions(product, data);
 
   try {
-    const [variant] = await db
-      .insert(productVariants)
-      .values({ ...data, productId })
-      .returning();
-    if (!variant) throw new AppError(500, 'Failed to create variant');
-    return variant;
+    return await db.transaction(async (tx) => {
+      const [variant] = await tx
+        .insert(productVariants)
+        .values({ ...data, productId })
+        .returning();
+      if (!variant) throw new AppError(500, 'Failed to create variant');
+
+      await recordAudit(tx, {
+        entityType: 'variant',
+        entityId: variant.id,
+        action: 'create',
+        changes: changesBetween({}, variant, VARIANT_FIELDS),
+      });
+
+      return variant;
+    });
   } catch (error) {
     throw toAppError(error);
   }
@@ -172,22 +230,28 @@ export async function updateVariant(
   data: UpdateVariantBody,
 ): Promise<ProductVariant> {
   const product = await findProduct(productId);
-  const [existing] = await db
-    .select()
-    .from(productVariants)
-    .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)));
-
-  if (!existing) variantNotFound(variantId);
-
-  assertValuesMatchOptions(product, { ...existing, ...data });
 
   try {
-    const [variant] = await db
-      .update(productVariants)
-      .set(data)
-      .where(eq(productVariants.id, variantId))
-      .returning();
-    if (!variant) variantNotFound(variantId);
+    const variant = await db.transaction(async (tx) => {
+      const existing = await lockVariant(tx, productId, variantId);
+      assertValuesMatchOptions(product, { ...existing, ...data });
+
+      const [updated] = await tx
+        .update(productVariants)
+        .set(data)
+        .where(eq(productVariants.id, variantId))
+        .returning();
+      if (!updated) variantNotFound(variantId);
+
+      await recordAudit(tx, {
+        entityType: 'variant',
+        entityId: variantId,
+        action: 'update',
+        changes: changesBetween(existing, updated, Object.keys(data)),
+      });
+
+      return updated;
+    });
 
     const { priceCents, stock, active } = data;
     logger.info(
@@ -205,13 +269,20 @@ export async function updateVariant(
 }
 
 export async function deactivateVariant(productId: string, variantId: string): Promise<void> {
-  const [variant] = await db
-    .update(productVariants)
-    .set({ active: false })
-    .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
-    .returning({ id: productVariants.id });
+  await db.transaction(async (tx) => {
+    const existing = await lockVariant(tx, productId, variantId);
 
-  if (!variant) variantNotFound(variantId);
+    await tx
+      .update(productVariants)
+      .set({ active: false })
+      .where(eq(productVariants.id, variantId));
+    await recordAudit(tx, {
+      entityType: 'variant',
+      entityId: variantId,
+      action: 'deactivate',
+      changes: changesBetween(existing, { active: false }, ['active']),
+    });
+  });
 
   logger.info({ productId, variantId }, 'Variant deactivated');
 }
@@ -258,8 +329,15 @@ export async function addImage(productId: string, { assetId, altText }: AddImage
       const [image] = await tx
         .insert(productImages)
         .values({ productId, assetId, altText, position: total })
-        .returning({ id: productImages.id });
+        .returning();
       if (!image) throw new AppError(500, 'Failed to add image');
+
+      await recordAudit(tx, {
+        entityType: 'product_image',
+        entityId: image.id,
+        action: 'create',
+        changes: changesBetween({}, image, IMAGE_FIELDS),
+      });
 
       return image.id;
     });
@@ -277,25 +355,48 @@ export async function addImage(productId: string, { assetId, altText }: AddImage
 }
 
 export async function updateImage(productId: string, imageId: string, data: UpdateImageBody) {
-  const [image] = await db
-    .update(productImages)
-    .set(data)
-    .where(imageKey(productId, imageId))
-    .returning({ id: productImages.id });
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(productImages)
+      .where(imageKey(productId, imageId))
+      .for('update');
+    if (!existing) imageNotFound(imageId);
 
-  if (!image) imageNotFound(imageId);
+    const [image] = await tx
+      .update(productImages)
+      .set(data)
+      .where(imageKey(productId, imageId))
+      .returning();
+    if (!image) imageNotFound(imageId);
+
+    await recordAudit(tx, {
+      entityType: 'product_image',
+      entityId: imageId,
+      action: 'update',
+      changes: changesBetween(existing, image, Object.keys(data)),
+    });
+  });
 
   return getImage(productId, imageId);
 }
 
 export async function removeImage(productId: string, imageId: string): Promise<void> {
   try {
-    const [image] = await db
-      .delete(productImages)
-      .where(imageKey(productId, imageId))
-      .returning({ id: productImages.id });
+    await db.transaction(async (tx) => {
+      const [image] = await tx
+        .delete(productImages)
+        .where(imageKey(productId, imageId))
+        .returning();
+      if (!image) imageNotFound(imageId);
 
-    if (!image) imageNotFound(imageId);
+      await recordAudit(tx, {
+        entityType: 'product_image',
+        entityId: imageId,
+        action: 'delete',
+        changes: changesBetween(image, {}, IMAGE_FIELDS),
+      });
+    });
   } catch (error) {
     if (hasDbErrorCode(error, FOREIGN_KEY_VIOLATION)) {
       throw new AppError(409, 'Image is still used by a variant');
@@ -320,6 +421,25 @@ function imageNotFound(id: string): never {
 async function findProduct(id: string): Promise<Product> {
   const [product] = await db.select().from(products).where(eq(products.id, id));
   return product ?? notFound(id);
+}
+
+/** Holds the row until the transaction ends, so that its audit entry shows the true before. */
+async function lockProduct(tx: Transaction, id: string): Promise<Product> {
+  const [product] = await tx
+    .select()
+    .from(products)
+    .where(eq(products.id, id))
+    .for('no key update');
+  return product ?? notFound(id);
+}
+
+async function lockVariant(tx: Transaction, productId: string, variantId: string) {
+  const [variant] = await tx
+    .select()
+    .from(productVariants)
+    .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
+    .for('no key update');
+  return variant ?? variantNotFound(variantId);
 }
 
 function findVariants(productIds: string[], includeInactive: boolean) {
