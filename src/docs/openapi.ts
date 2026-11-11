@@ -4,6 +4,7 @@ import {
   addressSchemas,
 } from '../modules/addresses/address.openapi';
 import { assetPaths, assetSchemas } from '../modules/assets/asset.openapi';
+import { auditLogPaths, auditLogSchemas } from '../modules/audit-logs/audit-log.openapi';
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi';
 import { blogParameters, blogPaths, blogSchemas } from '../modules/blogs/blog.openapi';
 import { cartParameters, cartPaths, cartSchemas } from '../modules/cart/cart.openapi';
@@ -49,6 +50,7 @@ export const openApiDocument = {
     { name: 'Addresses' },
     { name: 'Assets' },
     { name: 'Reports' },
+    { name: 'Audit Logs' },
   ],
   paths: {
     '/health': {
@@ -82,6 +84,7 @@ export const openApiDocument = {
     ...addressPaths,
     ...assetPaths,
     ...reportPaths,
+    ...auditLogPaths,
   },
   components: {
     securitySchemes: {
@@ -121,6 +124,7 @@ export const openApiDocument = {
       ...addressSchemas,
       ...assetSchemas,
       ...reportSchemas,
+      ...auditLogSchemas,
       PageMeta: {
         type: 'object',
         required: ['page', 'limit', 'total'],

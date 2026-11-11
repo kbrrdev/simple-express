@@ -5,10 +5,19 @@ import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../l
 import { logger } from '../../lib/logger';
 import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
+import { changesBetween, recordAudit } from '../audit-logs/audit-log.service';
 import { paymentMethods, type PaymentMethod } from './payment-method.schema';
 import type { CreatePaymentMethodBody, UpdatePaymentMethodBody } from './payment-method.validation';
 
 const methodFields = { ...getTableColumns(paymentMethods), qrPath: assets.path };
+const METHOD_FIELDS = [
+  'type',
+  'providerName',
+  'accountName',
+  'accountNumber',
+  'qrAssetId',
+  'enabled',
+];
 
 function toAdminMethod({ qrPath, ...method }: PaymentMethod & { qrPath: string | null }) {
   return { ...method, qrUrl: qrPath ? fileUrl(qrPath) : null };
@@ -49,15 +58,23 @@ async function getMethod(id: string) {
 
 export async function createMethod(data: CreatePaymentMethodBody) {
   try {
-    const [method] = await db
-      .insert(paymentMethods)
-      .values(data)
-      .returning({ id: paymentMethods.id });
-    if (!method) throw new AppError(500, 'Failed to create payment method');
+    const id = await db.transaction(async (tx) => {
+      const [method] = await tx.insert(paymentMethods).values(data).returning();
+      if (!method) throw new AppError(500, 'Failed to create payment method');
 
-    logger.info({ paymentMethodId: method.id }, 'Payment method added');
+      await recordAudit(tx, {
+        entityType: 'payment_method',
+        entityId: method.id,
+        action: 'create',
+        changes: changesBetween({}, method, METHOD_FIELDS),
+      });
 
-    return await getMethod(method.id);
+      return method.id;
+    });
+
+    logger.info({ paymentMethodId: id }, 'Payment method added');
+
+    return await getMethod(id);
   } catch (error) {
     throw toAppError(error);
   }
@@ -65,12 +82,28 @@ export async function createMethod(data: CreatePaymentMethodBody) {
 
 export async function updateMethod(id: string, data: UpdatePaymentMethodBody) {
   try {
-    const [method] = await db
-      .update(paymentMethods)
-      .set(data)
-      .where(eq(paymentMethods.id, id))
-      .returning({ id: paymentMethods.id });
-    if (!method) notFound(id);
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(paymentMethods)
+        .where(eq(paymentMethods.id, id))
+        .for('update');
+      if (!existing) notFound(id);
+
+      const [method] = await tx
+        .update(paymentMethods)
+        .set(data)
+        .where(eq(paymentMethods.id, id))
+        .returning();
+      if (!method) notFound(id);
+
+      await recordAudit(tx, {
+        entityType: 'payment_method',
+        entityId: id,
+        action: 'update',
+        changes: changesBetween(existing, method, Object.keys(data)),
+      });
+    });
 
     // Field names only, so that account details stay out of the logs.
     logger.info({ paymentMethodId: id, fields: Object.keys(data) }, 'Payment method changed');
@@ -83,12 +116,17 @@ export async function updateMethod(id: string, data: UpdatePaymentMethodBody) {
 
 export async function deleteMethod(id: string): Promise<void> {
   try {
-    const [method] = await db
-      .delete(paymentMethods)
-      .where(eq(paymentMethods.id, id))
-      .returning({ id: paymentMethods.id });
+    await db.transaction(async (tx) => {
+      const [method] = await tx.delete(paymentMethods).where(eq(paymentMethods.id, id)).returning();
+      if (!method) notFound(id);
 
-    if (!method) notFound(id);
+      await recordAudit(tx, {
+        entityType: 'payment_method',
+        entityId: id,
+        action: 'delete',
+        changes: changesBetween(method, {}, METHOD_FIELDS),
+      });
+    });
 
     logger.info({ paymentMethodId: id }, 'Payment method deleted');
   } catch (error) {

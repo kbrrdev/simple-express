@@ -140,6 +140,7 @@ src/
 └── modules/
     ├── addresses/
     ├── assets/
+    ├── audit-logs/
     ├── auth/
     ├── blogs/
     ├── cart/
@@ -318,6 +319,8 @@ npm run db:make-admin -- jane@example.com
 ```
 
 In the production container, run `docker compose exec api node dist/db/make-admin.js jane@example.com`.
+
+Every role change is recorded in the [audit log](#audit-logs).
 
 ## Blogs
 
@@ -530,6 +533,29 @@ Ranges take `from` and `to` as dates, such as `?from=2026-03-01&to=2026-03-31`. 
 - **Refunded** is payments received in the range that were later refunded.
 
 Reports use the amounts saved on each order, so changing the tax rate never changes past figures. If the rate changes during a range, `taxByRate` in the summary lists each rate separately.
+
+## Audit Logs
+
+`GET /api/audit-logs` lists changes, newest first, for admins only. It records:
+
+- Admin changes to products, variants (including stock), product images, categories, blogs, payment methods, files, and orders.
+- Password changes, password resets, signing out everywhere, and role changes.
+
+Customer carts, addresses, and checkouts are not recorded. The request logs cover them.
+
+Each entry has the user who made the change, the entity, an `action` such as `create`, `update`, or `status_change`, and `changes`, which holds each changed field as `[before, after]`:
+
+```json
+{ "action": "update", "entityType": "variant", "changes": { "priceCents": [4500, 3900] } }
+```
+
+- `actorUserId` is `null` for scripts, such as `db:make-admin`.
+- `requestId` matches the `requestId` in the server logs.
+- Account numbers and password hashes show as `[redacted]`.
+
+Filter with `actorUserId`, `entityType`, `entityId`, `action`, and `from` and `to` dates in Manila time.
+
+Entries are saved in the same transaction as the change, so a failed change leaves none. The API's database role can add and read entries, but cannot change or delete them.
 
 ## Addresses
 

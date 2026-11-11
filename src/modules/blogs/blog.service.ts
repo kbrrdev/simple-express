@@ -4,10 +4,12 @@ import { AppError } from '../../lib/app-error';
 import { FOREIGN_KEY_VIOLATION, hasDbErrorCode } from '../../lib/db-errors';
 import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
+import { changesBetween, recordAudit } from '../audit-logs/audit-log.service';
 import { blogs, type Blog } from './blog.schema';
 import type { CreateBlogBody, ListBlogsQuery, UpdateBlogBody } from './blog.validation';
 
 const blogFields = { ...getTableColumns(blogs), coverPath: assets.path };
+const BLOG_FIELDS = ['title', 'content', 'author', 'published', 'coverAssetId'];
 
 function toPublicBlog({ coverPath, ...blog }: Blog & { coverPath: string | null }) {
   return { ...blog, coverImageUrl: coverPath ? fileUrl(coverPath) : null };
@@ -45,10 +47,21 @@ export async function getBlog(id: string, includeDrafts = false) {
 
 export async function createBlog(data: CreateBlogBody) {
   try {
-    const [blog] = await db.insert(blogs).values(data).returning({ id: blogs.id });
-    if (!blog) throw new AppError(500, 'Failed to create blog');
+    const id = await db.transaction(async (tx) => {
+      const [blog] = await tx.insert(blogs).values(data).returning();
+      if (!blog) throw new AppError(500, 'Failed to create blog');
 
-    return await getBlog(blog.id, true);
+      await recordAudit(tx, {
+        entityType: 'blog',
+        entityId: blog.id,
+        action: 'create',
+        changes: changesBetween({}, blog, BLOG_FIELDS),
+      });
+
+      return blog.id;
+    });
+
+    return await getBlog(id, true);
   } catch (error) {
     throw toAppError(error);
   }
@@ -56,12 +69,20 @@ export async function createBlog(data: CreateBlogBody) {
 
 export async function updateBlog(id: string, data: UpdateBlogBody) {
   try {
-    const [blog] = await db
-      .update(blogs)
-      .set(data)
-      .where(eq(blogs.id, id))
-      .returning({ id: blogs.id });
-    if (!blog) notFound(id);
+    await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(blogs).where(eq(blogs.id, id)).for('update');
+      if (!existing) notFound(id);
+
+      const [blog] = await tx.update(blogs).set(data).where(eq(blogs.id, id)).returning();
+      if (!blog) notFound(id);
+
+      await recordAudit(tx, {
+        entityType: 'blog',
+        entityId: id,
+        action: 'update',
+        changes: changesBetween(existing, blog, Object.keys(data)),
+      });
+    });
 
     return await getBlog(id, true);
   } catch (error) {
@@ -70,8 +91,17 @@ export async function updateBlog(id: string, data: UpdateBlogBody) {
 }
 
 export async function deleteBlog(id: string): Promise<void> {
-  const [blog] = await db.delete(blogs).where(eq(blogs.id, id)).returning({ id: blogs.id });
-  if (!blog) notFound(id);
+  await db.transaction(async (tx) => {
+    const [blog] = await tx.delete(blogs).where(eq(blogs.id, id)).returning();
+    if (!blog) notFound(id);
+
+    await recordAudit(tx, {
+      entityType: 'blog',
+      entityId: id,
+      action: 'delete',
+      changes: changesBetween(blog, {}, BLOG_FIELDS),
+    });
+  });
 }
 
 function toAppError(error: unknown) {

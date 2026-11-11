@@ -7,6 +7,7 @@ import { openApiDocument } from '../docs/openapi';
 import { usesS3 } from '../lib/storage';
 import { addressRoutes } from '../modules/addresses/address.routes';
 import { assetRoutes } from '../modules/assets/asset.routes';
+import { auditLogRoutes } from '../modules/audit-logs/audit-log.routes';
 import { authRoutes } from '../modules/auth/auth.routes';
 import { blogRoutes } from '../modules/blogs/blog.routes';
 import { cartRoutes } from '../modules/cart/cart.routes';
@@ -21,6 +22,7 @@ const apiRoutes = Router();
 // Register each module here. Paths are relative to /api.
 apiRoutes.use('/addresses', addressRoutes);
 apiRoutes.use('/assets', assetRoutes);
+apiRoutes.use('/audit-logs', auditLogRoutes);
 apiRoutes.use('/auth', authRoutes);
 apiRoutes.use('/blogs', blogRoutes);
 apiRoutes.use('/cart', cartRoutes);

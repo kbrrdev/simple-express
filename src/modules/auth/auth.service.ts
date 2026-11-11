@@ -14,6 +14,7 @@ import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { sendEmail } from '../../lib/email';
 import { logger } from '../../lib/logger';
+import { recordAudit } from '../audit-logs/audit-log.service';
 import { loginAttempts, passwordResets, sessions, users } from './auth.schema';
 import type { ChangePasswordBody, RegisterBody, ResetPasswordBody } from './auth.validation';
 
@@ -282,10 +283,13 @@ export async function logout(sessionId: string) {
 }
 
 export async function logoutAll(userId: string) {
-  await db
-    .update(sessions)
-    .set({ revokedAt: new Date() })
-    .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+    await recordAudit(tx, { entityType: 'user', entityId: userId, action: 'sessions_revoke' });
+  });
 }
 
 /** Ends the user's other sessions, in case the password was changed because of a leak. */
@@ -316,6 +320,7 @@ export async function changePassword(
       .where(
         and(eq(sessions.userId, userId), ne(sessions.id, sessionId), isNull(sessions.revokedAt)),
       );
+    await recordAudit(tx, { entityType: 'user', entityId: userId, action: 'password_change' });
   });
 
   logger.info('Password changed, other sessions ended');
@@ -424,6 +429,12 @@ export async function resetPassword({ token, newPassword }: ResetPasswordBody) {
       .where(and(eq(passwordResets.userId, reset.userId), isNull(passwordResets.usedAt)));
 
     if (user) await tx.delete(loginAttempts).where(eq(loginAttempts.email, user.email));
+
+    await recordAudit(tx, {
+      entityType: 'user',
+      entityId: reset.userId,
+      action: 'password_reset',
+    });
   });
 
   logger.info('Password reset, all sessions ended');

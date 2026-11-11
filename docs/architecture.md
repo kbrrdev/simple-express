@@ -100,6 +100,7 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api-docs.json`       | OpenAPI, not in production    |
 | `/api/addresses`       | Addresses module              |
 | `/api/assets`          | Assets module                 |
+| `/api/audit-logs`      | Audit logs module             |
 | `/api/auth`            | Auth module                   |
 | `/api/blogs`           | Blogs module                  |
 | `/api/cart`            | Cart module                   |
@@ -198,6 +199,15 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Gross sales are orders placed in the range, apart from cancelled ones. Collected counts payments by `paid_at`, and refunds against the period the payment arrived in, as no refund date is stored.
 - Orders paid before `paid_at` existed took their `updated_at` as a best guess.
 - Reports are aggregated on each request, as a store this size needs no caching. `orders.created_at` and `orders.paid_at` are indexed for date ranges, and a daily chart covers up to 366 days.
+
+## Audit Logs
+
+- `audit_logs` records admin changes, and password, session, and role changes. Customer carts, addresses, and checkouts are left to the request logs.
+- Services call `recordAudit` inside the transaction that makes the change, so an entry is kept only if the change is. Rows changed by admins are locked first, so the values before are accurate.
+- The actor and `requestId` come from the request context, so services do not pass them. Scripts have no actor.
+- `changes` holds each changed field as `[before, after]`. `accountNumber` and `passwordHash` are replaced with `[redacted]`.
+- `migrate.ts` revokes `UPDATE` and `DELETE` on `audit_logs` from the API's role, so history can only be added to.
+- `db:make-admin` records any role change, so admin levels added later are covered.
 
 ## Addresses
 

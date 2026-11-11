@@ -4,6 +4,7 @@ import { AppError } from '../../lib/app-error';
 import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
 import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
+import { changesBetween, recordAudit } from '../audit-logs/audit-log.service';
 import { categories, type Category } from './category.schema';
 import {
   MAX_CATEGORY_DEPTH,
@@ -19,6 +20,7 @@ type ParentMap = Map<string, string | null>;
 
 const categoryFields = { ...getTableColumns(categories), imagePath: assets.path };
 const byName = [asc(categories.name), asc(categories.id)];
+const CATEGORY_FIELDS = ['name', 'parentId', 'imageAssetId'];
 
 function toPublicCategory({ imagePath, ...category }: Category & { imagePath: string | null }) {
   return { ...category, imageUrl: imagePath ? fileUrl(imagePath) : null };
@@ -109,8 +111,16 @@ export async function createCategory(data: CreateCategoryBody) {
     const id = await withTreeLock(async (tx, parents) => {
       checkParent(parents, data.parentId ?? null, 1);
 
-      const [category] = await tx.insert(categories).values(data).returning({ id: categories.id });
+      const [category] = await tx.insert(categories).values(data).returning();
       if (!category) throw new AppError(500, 'Failed to create category');
+
+      await recordAudit(tx, {
+        entityType: 'category',
+        entityId: category.id,
+        action: 'create',
+        changes: changesBetween({}, category, CATEGORY_FIELDS),
+      });
+
       return category.id;
     });
 
@@ -130,7 +140,20 @@ export async function updateCategory(id: string, data: UpdateCategoryBody) {
         checkParent(parents, data.parentId, heightOf(parents, id), id);
       }
 
-      await tx.update(categories).set(data).where(eq(categories.id, id));
+      const [existing] = await tx.select().from(categories).where(eq(categories.id, id));
+      const [updated] = await tx
+        .update(categories)
+        .set(data)
+        .where(eq(categories.id, id))
+        .returning();
+      if (!existing || !updated) notFound(id);
+
+      await recordAudit(tx, {
+        entityType: 'category',
+        entityId: id,
+        action: 'update',
+        changes: changesBetween(existing, updated, Object.keys(data)),
+      });
     });
 
     return await getCategory(id);
@@ -148,7 +171,15 @@ export async function deleteCategory(id: string): Promise<void> {
         throw new AppError(409, 'Category still has subcategories');
       }
 
-      await tx.delete(categories).where(eq(categories.id, id));
+      const [deleted] = await tx.delete(categories).where(eq(categories.id, id)).returning();
+      if (!deleted) notFound(id);
+
+      await recordAudit(tx, {
+        entityType: 'category',
+        entityId: id,
+        action: 'delete',
+        changes: changesBetween(deleted, {}, CATEGORY_FIELDS),
+      });
     });
   } catch (error) {
     if (hasDbErrorCode(error, FOREIGN_KEY_VIOLATION)) {
