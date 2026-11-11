@@ -675,6 +675,7 @@ export async function markPaid(tx: Transaction, orderId: string) {
     .set({
       paymentStatus: 'paid',
       paymentDueAt: null,
+      paidAt: new Date(),
       status: sql`case when ${orders.status} = 'awaiting_payment' then 'pending'::order_status else ${orders.status} end`,
     })
     .where(and(eq(orders.id, orderId), ne(orders.paymentStatus, 'paid')))

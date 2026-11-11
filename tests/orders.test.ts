@@ -932,8 +932,13 @@ describe('COD payment', () => {
     await setStatus(order.id, 'shipped').expect(200);
 
     const response = await setStatus(order.id, 'delivered').expect(200);
+    const [saved] = await db
+      .select({ paidAt: orders.paidAt })
+      .from(orders)
+      .where(eq(orders.id, order.id));
 
     expect(response.body.data.paymentStatus).toBe('paid');
+    expect(saved?.paidAt).toBeInstanceOf(Date);
   });
 
   it('stays unpaid when cancelled', async () => {

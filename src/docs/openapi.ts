@@ -23,6 +23,7 @@ import {
   productPaths,
   productSchemas,
 } from '../modules/products/product.openapi';
+import { reportParameters, reportPaths, reportSchemas } from '../modules/reports/report.openapi';
 
 const errorContent = {
   'application/json': { schema: { $ref: '#/components/schemas/Error' } },
@@ -47,6 +48,7 @@ export const openApiDocument = {
     { name: 'Orders' },
     { name: 'Addresses' },
     { name: 'Assets' },
+    { name: 'Reports' },
   ],
   paths: {
     '/health': {
@@ -79,6 +81,7 @@ export const openApiDocument = {
     ...orderPaths,
     ...addressPaths,
     ...assetPaths,
+    ...reportPaths,
   },
   components: {
     securitySchemes: {
@@ -92,6 +95,7 @@ export const openApiDocument = {
       ...orderParameters,
       ...paymentMethodParameters,
       ...addressParameters,
+      ...reportParameters,
     },
     responses: {
       BadRequest: { description: 'The request is invalid', content: errorContent },
@@ -116,6 +120,7 @@ export const openApiDocument = {
       ...paymentMethodSchemas,
       ...addressSchemas,
       ...assetSchemas,
+      ...reportSchemas,
       PageMeta: {
         type: 'object',
         required: ['page', 'limit', 'total'],

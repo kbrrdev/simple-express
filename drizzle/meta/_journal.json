@@ -120,6 +120,13 @@
       "when": 1794333699713,
       "tag": "0016_nest_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794398780839,
+      "tag": "0017_order_paid_at",
+      "breakpoints": true
     }
   ]
 }
