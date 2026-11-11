@@ -6,13 +6,17 @@ import { createAsset } from '../modules/assets/asset.service';
 import { register } from '../modules/auth/auth.service';
 import { createBlog } from '../modules/blogs/blog.service';
 import { addItem } from '../modules/cart/cart.service';
+import type { CartItemInput } from '../modules/cart/cart.validation';
 import { createCategory } from '../modules/categories/category.service';
+import type { OrderStatus } from '../modules/orders/order.schema';
 import {
   cancelOwnOrder,
   confirmPayment,
   createGuestOrder,
   createOrder,
   previewOrder,
+  refundPayment,
+  rejectPayment,
   submitOwnPayment,
   updateOrderStatus,
 } from '../modules/orders/order.service';
@@ -65,7 +69,7 @@ async function checkout(
   userId: string,
   addressId: string,
   paymentMethod: string,
-  items: { variantId: string; quantity: number }[],
+  items: CartItemInput[],
 ) {
   for (const item of items) {
     await addItem(userId, item);
@@ -80,6 +84,12 @@ async function checkout(
   });
 
   return order.id;
+}
+
+async function moveTo(orderId: string, ...statuses: OrderStatus[]) {
+  for (const status of statuses) {
+    await updateOrderStatus(orderId, status);
+  }
 }
 
 async function main() {
@@ -229,42 +239,98 @@ async function main() {
     author: 'Store Team',
   });
 
-  // Delivered by COD, which marks it paid.
-  const delivered = await checkout(customer.id, home.id, 'cod', [
+  const basics = [
     { variantId: variant(tShirt, 0), quantity: 2 },
-    { variantId: variant(tShirt, 1), quantity: 1 },
     { variantId: variant(tote, 0), quantity: 1 },
-  ]);
-  await updateOrderStatus(delivered, 'confirmed');
-  await updateOrderStatus(delivered, 'shipped');
-  await updateOrderStatus(delivered, 'delivered');
-
-  // Paid by GCash and confirmed by an admin.
-  const confirmed = await checkout(customer.id, home.id, gcash.id, [
-    { variantId: variant(runner, 1), quantity: 1 },
-    { variantId: variant(tShirt, 2), quantity: 1 },
-  ]);
-  await submitOwnPayment(customer.id, confirmed, 'GC-1000000001');
-  await confirmPayment(confirmed);
-  await updateOrderStatus(confirmed, 'confirmed');
-
-  // A reference waiting for an admin to check it.
-  const submitted = await checkout(customer.id, home.id, bank.id, [
+  ];
+  const shoes = [{ variantId: variant(runner, 1), quantity: 1 }];
+  const outfit = [
     { variantId: variant(dress, 0), quantity: 1 },
     { variantId: variant(flats, 0), quantity: 1 },
+    { variantId: variant(tote, 0), quantity: 1 },
+  ];
+  const mixed = [
+    { variantId: variant(tShirt, 2), quantity: 1 },
+    { variantId: variant(runner, 0), quantity: 1 },
+  ];
+  const flatsAndTote = [
+    { variantId: variant(flats, 1), quantity: 1 },
     { variantId: variant(tote, 0), quantity: 2 },
-  ]);
-  await submitOwnPayment(customer.id, submitted, 'BPI-2000000002');
+  ];
+  const summer = [
+    { variantId: variant(tShirt, 1), quantity: 1 },
+    { variantId: variant(dress, 1), quantity: 1 },
+    { variantId: variant(tote, 0), quantity: 1 },
+  ];
 
-  // Waiting for the customer to pay.
-  await checkout(customer.id, home.id, gcash.id, [{ variantId: variant(flats, 1), quantity: 1 }]);
+  const order = (paymentMethod: string, items: CartItemInput[]) =>
+    checkout(customer.id, home.id, paymentMethod, items);
 
-  // Cancelled by the customer, which returns the stock.
-  const cancelled = await checkout(customer.id, home.id, 'cod', [
-    { variantId: variant(tote, 0), quantity: 3 },
-    { variantId: variant(runner, 2), quantity: 1 },
-  ]);
-  await cancelOwnOrder(customer.id, cancelled);
+  /** Places a manual order, then submits a reference that an admin confirms. */
+  const paidOrder = async (paymentMethod: string, items: CartItemInput[], reference: string) => {
+    const id = await order(paymentMethod, items);
+    await submitOwnPayment(customer.id, id, reference);
+    await confirmPayment(id);
+    return id;
+  };
+
+  // One order for every combination of status and payment status that can happen.
+  // COD orders are only paid on delivery.
+  await moveTo(await order('cod', basics), 'confirmed');
+  await moveTo(await order('cod', shoes), 'confirmed', 'shipped');
+  await moveTo(await order('cod', outfit), 'confirmed', 'shipped', 'delivered');
+
+  const codRefunded = await order('cod', mixed);
+  await moveTo(codRefunded, 'confirmed', 'shipped', 'delivered');
+  await refundPayment(codRefunded);
+
+  await moveTo(await order('cod', flatsAndTote), 'confirmed', 'shipped', 'returned');
+  await cancelOwnOrder(customer.id, await order('cod', summer));
+
+  // Manual orders are paid when an admin confirms the reference, which moves them to pending.
+  await paidOrder(gcash.id, basics, 'GC-1000000001');
+  await moveTo(await paidOrder(bank.id, shoes, 'BPI-2000000001'), 'confirmed');
+  await moveTo(await paidOrder(gcash.id, outfit, 'GC-1000000002'), 'confirmed', 'shipped');
+  await moveTo(
+    await paidOrder(bank.id, mixed, 'BPI-2000000002'),
+    'confirmed',
+    'shipped',
+    'delivered',
+  );
+
+  const deliveredRefunded = await paidOrder(gcash.id, flatsAndTote, 'GC-1000000003');
+  await moveTo(deliveredRefunded, 'confirmed', 'shipped', 'delivered');
+  await refundPayment(deliveredRefunded);
+
+  await moveTo(
+    await paidOrder(bank.id, summer, 'BPI-2000000003'),
+    'confirmed',
+    'shipped',
+    'returned',
+  );
+
+  const returnedRefunded = await paidOrder(gcash.id, basics, 'GC-1000000004');
+  await moveTo(returnedRefunded, 'confirmed', 'shipped', 'returned');
+  await refundPayment(returnedRefunded);
+
+  await cancelOwnOrder(customer.id, await order(bank.id, shoes));
+
+  // Cancelled after payment, so the refund is still owed.
+  await moveTo(await paidOrder(gcash.id, outfit, 'GC-1000000005'), 'cancelled');
+
+  const cancelledRefunded = await paidOrder(bank.id, mixed, 'BPI-2000000004');
+  await moveTo(cancelledRefunded, 'cancelled');
+  await refundPayment(cancelledRefunded);
+
+  // Rejected references cancel the order, but the payment row stays for the admin to see.
+  const rejected = await order(gcash.id, flatsAndTote);
+  await submitOwnPayment(customer.id, rejected, 'GC-1000000006');
+  await rejectPayment(rejected);
+
+  // Open orders come last, as checkout limits how many unpaid orders a customer can have.
+  await order('cod', summer);
+  await order(gcash.id, basics);
+  await submitOwnPayment(customer.id, await order(bank.id, shoes), 'BPI-2000000005');
 
   const guestItems = [
     { variantId: variant(tote, 0), quantity: 1 },

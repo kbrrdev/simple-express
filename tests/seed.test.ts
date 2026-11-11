@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { count, eq, sql } from 'drizzle-orm';
+import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { db, pool } from '../src/db';
 import {
@@ -75,28 +75,51 @@ describe('seed', () => {
       expect(row?.total).toBeGreaterThan(0);
     }
 
-    const statuses = await db
-      .select({ status: orders.status, paymentStatus: orders.paymentStatus })
-      .from(orders)
-      .orderBy(orders.orderNumber);
+    const rows = await db
+      .selectDistinct({
+        paymentType: orders.paymentType,
+        status: orders.status,
+        paymentStatus: orders.paymentStatus,
+      })
+      .from(orders);
+    const combinations = rows.map((row) => `${row.paymentType} ${row.status} ${row.paymentStatus}`);
 
-    expect(statuses).toEqual([
-      { status: 'delivered', paymentStatus: 'paid' },
-      { status: 'confirmed', paymentStatus: 'paid' },
-      { status: 'awaiting_payment', paymentStatus: 'submitted' },
-      { status: 'awaiting_payment', paymentStatus: 'unpaid' },
-      { status: 'cancelled', paymentStatus: 'unpaid' },
-      { status: 'awaiting_payment', paymentStatus: 'unpaid' },
-    ]);
+    expect(combinations.sort()).toEqual(
+      [
+        'cod pending unpaid',
+        'cod confirmed unpaid',
+        'cod shipped unpaid',
+        'cod delivered paid',
+        'cod delivered refunded',
+        'cod returned unpaid',
+        'cod cancelled unpaid',
+        'manual awaiting_payment unpaid',
+        'manual awaiting_payment submitted',
+        'manual pending paid',
+        'manual confirmed paid',
+        'manual shipped paid',
+        'manual delivered paid',
+        'manual delivered refunded',
+        'manual returned paid',
+        'manual returned refunded',
+        'manual cancelled unpaid',
+        'manual cancelled paid',
+        'manual cancelled refunded',
+      ].sort(),
+    );
 
-    const lines = await db
+    const [rejected] = await db
       .select({ total: count() })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .groupBy(orders.orderNumber)
-      .orderBy(orders.orderNumber);
+      .from(orders)
+      .innerJoin(payments, eq(payments.orderId, orders.id))
+      .where(and(eq(orders.status, 'cancelled'), eq(orders.paymentStatus, 'unpaid')));
 
-    expect(lines.map((row) => row.total)).toEqual([3, 2, 3, 1, 2, 2]);
+    expect(rejected?.total).toBe(1);
+
+    const lines = await db.select({ total: count() }).from(orderItems).groupBy(orderItems.orderId);
+    const multiItem = lines.filter((row) => row.total > 1);
+
+    expect(multiItem.length).toBeGreaterThan(lines.length / 2);
   }, 60000);
 
   it('refuses to run twice', () => {

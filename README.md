@@ -211,7 +211,7 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds an admin and a customer, nested categories, products with variants and images, payment methods, blogs, a cart, and orders in each status, most with several items. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds an admin and a customer, nested categories, products with variants and images, payment methods, blogs, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
 | Email                  | Role     | Password           |
 | ---------------------- | -------- | ------------------ |
