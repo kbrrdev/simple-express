@@ -349,12 +349,14 @@ Super admins can change Admin and Staff, and create roles of their own:
 | `GET /api/roles/:id`         | Get a role                                            |
 | `PATCH /api/roles/:id`       | Rename a role or replace its permissions              |
 | `DELETE /api/roles/:id`      | Delete a role that no user has                        |
+| `GET /api/users`             | Find users by part of their email, or by role         |
 | `PATCH /api/users/:id/role`  | Give a user a role, or `null` to make them a customer |
 
 - Permissions are read on every request, so changes apply immediately, even to tokens already issued.
 - Super admins cannot change their own role, so the store always keeps at least one.
 - Managing roles is not a permission, so nobody can grant themselves more access.
-- `GET /api/auth/me` returns the user's `role` and `permissions`, so a frontend can hide what they cannot use.
+- `GET /api/users?type=staff` lists everyone with a role, for a CMS users screen. `?type=customer&search=jane` finds a customer to promote. It also takes `roleId`, `page`, and `limit`.
+- `GET /api/auth/me` returns the user's `role` and `permissions`, so a frontend can hide what they cannot use. It also returns `superAdmin`, which shows the role and user screens, as Admin can hold every permission too.
 - Every change to a role or to a user's role is recorded in the [audit log](#audit-logs).
 
 To protect a route, add `requirePermission('orders.view')` after `requireAuth`. A new feature adds its permission to `src/modules/roles/permissions.ts`, and super admins then add it to the roles that need it.

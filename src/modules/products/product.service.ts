@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, exists, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
+import { escapeLikePattern } from '../../lib/escape-like-pattern';
 import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
 import { logger } from '../../lib/logger';
 import { fileUrl } from '../../lib/storage';
@@ -462,10 +463,6 @@ function assertValuesMatchOptions(product: OptionNames, variant: OptionValues) {
   if (!option1Matches || !option2Matches) {
     throw new AppError(400, 'Variant values must match the options of the product');
   }
-}
-
-function escapeLikePattern(value: string) {
-  return value.replace(/[\\%_]/g, '\\$&');
 }
 
 function toAppError(error: unknown) {

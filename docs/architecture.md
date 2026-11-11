@@ -150,6 +150,8 @@ Central route registration. Module routes are mounted under `/api`.
 - Role changes and role assignments take an advisory lock. Assigning a role checks again under the lock that the actor is still a super admin, and super admins cannot change their own role, so two super admins cannot remove each other and leave none.
 - A role that users have cannot be deleted, as `users.role_id` restricts it.
 - `db:set-role` assigns roles from the command line, and is how the first super admin is made.
+- `GET /api/users` lets super admins find who to give a role. The user's `superAdmin` flag tells a frontend when to show role management, as Admin can hold every permission too.
+- Searches escape `%` and `_` with `src/lib/escape-like-pattern.ts`, so they match literally.
 
 ## Blogs
 

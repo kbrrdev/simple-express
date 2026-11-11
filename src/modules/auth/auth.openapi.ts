@@ -231,7 +231,7 @@ export const authPaths = {
 export const authSchemas = {
   User: {
     type: 'object',
-    required: ['id', 'email', 'role', 'permissions', 'createdAt'],
+    required: ['id', 'email', 'role', 'superAdmin', 'permissions', 'createdAt'],
     properties: {
       id: { type: 'string', format: 'uuid' },
       email: { type: 'string', format: 'email', example: 'jane@example.com' },
@@ -243,6 +243,11 @@ export const authSchemas = {
           id: { type: 'string', format: 'uuid' },
           name: { type: 'string', example: 'Staff' },
         },
+      },
+      superAdmin: {
+        type: 'boolean',
+        description:
+          'Only super admins manage roles and users. Admin can hold every permission too, so check this rather than the permissions.',
       },
       permissions: {
         type: 'array',

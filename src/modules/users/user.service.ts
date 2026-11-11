@@ -1,13 +1,54 @@
-import { eq } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, isNotNull, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
+import { escapeLikePattern } from '../../lib/escape-like-pattern';
 import { recordAudit } from '../audit-logs/audit-log.service';
 import { users } from '../auth/auth.schema';
 import { getUser } from '../auth/auth.service';
 import { roles, SUPER_ADMIN_ROLE_ID } from '../roles/role.schema';
 import { lockRoles } from '../roles/role.service';
+import type { ListUsersQuery } from './user.validation';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Lists CMS users with `type=staff`, or finds a customer to promote with `type=customer`.
+ * Searches part of the email, ignoring case. Customers are not indexed for this, as only
+ * super admins search them, and only now and then.
+ */
+export async function listUsers({ page, limit, search, type, roleId }: ListUsersQuery) {
+  const where = and(
+    search ? ilike(users.email, `%${escapeLikePattern(search)}%`) : undefined,
+    type === 'staff' ? isNotNull(users.roleId) : undefined,
+    type === 'customer' ? isNull(users.roleId) : undefined,
+    roleId ? eq(users.roleId, roleId) : undefined,
+  );
+
+  const [rows, totals] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        email: users.email,
+        roleId: users.roleId,
+        roleName: roles.name,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .leftJoin(roles, eq(users.roleId, roles.id))
+      .where(where)
+      .orderBy(desc(users.createdAt), desc(users.id))
+      .limit(limit)
+      .offset((page - 1) * limit),
+    db.select({ total: count() }).from(users).where(where),
+  ]);
+
+  const items = rows.map(({ roleId: id, roleName, ...user }) => ({
+    ...user,
+    role: id && roleName ? { id, name: roleName } : null,
+  }));
+
+  return { items, total: totals[0]?.total ?? 0 };
+}
 
 /**
  * Super admins cannot change their own role. As the one making the change is a super admin
