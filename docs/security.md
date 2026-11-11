@@ -48,7 +48,7 @@ If SQL injection or a credential leak ever happened, a superuser could read or d
 
 ### 3. Swagger public in production
 
-Swagger UI and `/api-docs.json` are only served when `NODE_ENV` is not `production`. The API's routes were already protected, so this only removes a map of the API.
+Swagger UI and `/api-docs.json` are only served when `APP_ENV` is not `production`. `APP_ENV` follows `NODE_ENV` when unset. The API's routes were already protected, so this only removes a map of the API.
 
 Use [postman-collection.json](postman-collection.json) to call the API. It does not depend on Swagger being served.
 
@@ -124,7 +124,7 @@ Finished orders now hide the shipping address from their link, so an old link st
 
 `.github/workflows/ci.yml` runs on pull requests, and `.github/dependabot.yml` checks dependencies weekly.
 
-**Remaining step:** CodeQL, secret scanning, and push protection are turned on in the repository's settings, as described in [security-tools.md](security-tools.md).
+**Remaining step:** turn on CodeQL, secret scanning, and push protection in the repository's settings, as described in [security-tools.md](security-tools.md).
 
 ### 19. Large order totals failed
 
@@ -183,7 +183,6 @@ Email is set up with `sendEmail` in `src/lib/email.ts`, Mailpit in development, 
 - **Manual payments:** always confirm a payment in the GCash or bank app itself, never from a reference or screenshot alone.
 - **Staging:** it serves Swagger, so it must stay private. Each environment has its own secrets and data, as described in [deployment.md](deployment.md).
 - **Traffic floods:** these are handled in front of the API, such as by a free Cloudflare plan, not in the API.
-
 - **Row Level Security:** not used. The API is the only client of the database, and queries are scoped to the user in the service layer. Reconsider it if anything else connects directly.
 
 ## Dependency Advisories
