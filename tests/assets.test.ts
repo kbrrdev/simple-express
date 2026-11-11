@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { env } from '../src/config/env';
 import { db, pool } from '../src/db';
-import { categories, productImages, users } from '../src/db/schema';
+import { categories, productImages, SUPER_ADMIN_ROLE_ID, users } from '../src/db/schema';
 
 const password = 'correct-horse-battery';
 const missingId = '00000000-0000-4000-8000-000000000000';
@@ -76,7 +76,10 @@ beforeAll(async () => {
   await db.execute(sql`truncate table users, sessions cascade`);
 
   adminToken = await registerAndLogin('admin@example.com');
-  await db.update(users).set({ role: 'admin' }).where(eq(users.email, 'admin@example.com'));
+  await db
+    .update(users)
+    .set({ roleId: SUPER_ADMIN_ROLE_ID })
+    .where(eq(users.email, 'admin@example.com'));
   customerToken = await registerAndLogin('customer@example.com');
 });
 

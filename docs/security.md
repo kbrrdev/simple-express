@@ -143,7 +143,7 @@ The API could be reached directly, skipping the proxy and HTTPS, as Docker can b
 **Plan:** deferred for now. Until it is built, use a long, unique password, and only make admins who need it. When it is built:
 
 - Use 6-digit authenticator app codes (TOTP), written with Node's `crypto` module and tested against the RFC 6238 examples.
-- Any user can turn it on, and `requireAdmin` returns `403` until an admin has.
+- Any user can turn it on, and `requirePermission` returns `403` until a user with a role has.
 - Login returns a 5-minute challenge token instead of tokens, and `POST /api/auth/login/verify` takes it with a code. Wrong codes count as failed logins.
 - `/api/auth/2fa/setup`, `/enable`, and `/disable` manage it. Enabling ends the other sessions, and disabling needs the password and a code.
 - Enabling returns 10 single-use recovery codes, of which only hashes are stored.

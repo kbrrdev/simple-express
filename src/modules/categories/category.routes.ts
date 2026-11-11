@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin, requireAuth } from '../../middleware/require-auth';
+import { requireAuth, requirePermission } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './category.controller';
 import {
@@ -16,7 +16,7 @@ categoryRoutes.get('/tree', controller.tree);
 categoryRoutes.post(
   '/',
   requireAuth,
-  requireAdmin,
+  requirePermission('categories.manage'),
   validate('body', createCategoryBody),
   controller.create,
 );
@@ -24,7 +24,7 @@ categoryRoutes.get('/:id', validate('params', categoryParams), controller.get);
 categoryRoutes.patch(
   '/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('categories.manage'),
   validate('params', categoryParams),
   validate('body', updateCategoryBody),
   controller.update,
@@ -32,7 +32,7 @@ categoryRoutes.patch(
 categoryRoutes.delete(
   '/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('categories.manage'),
   validate('params', categoryParams),
   controller.remove,
 );

@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import multer, { MulterError } from 'multer';
 import { AppError } from '../../lib/app-error';
-import { requireAdmin, requireAuth } from '../../middleware/require-auth';
+import { requireAuth, requirePermission } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './asset.controller';
 import { assetParams, listAssetsQuery } from './asset.validation';
@@ -30,7 +30,7 @@ const uploadFile: RequestHandler = (req, res, next) => {
 
 export const assetRoutes = Router();
 
-assetRoutes.use(requireAuth, requireAdmin);
+assetRoutes.use(requireAuth, requirePermission('assets.manage'));
 
 assetRoutes.get('/', validate('query', listAssetsQuery), controller.list);
 assetRoutes.post('/', uploadFile, controller.create);

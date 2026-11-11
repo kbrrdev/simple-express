@@ -19,7 +19,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "db:make-admin": "tsx src/db/make-admin.ts",
+    "db:set-role": "tsx src/db/set-role.ts",
     "db:seed": "tsx src/db/seed.ts",
     "postman": "tsx src/docs/generate-postman.ts",
     "email:test": "tsx src/lib/send-test-email.ts",

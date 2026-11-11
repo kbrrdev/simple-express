@@ -25,6 +25,8 @@ import {
   productSchemas,
 } from '../modules/products/product.openapi';
 import { reportParameters, reportPaths, reportSchemas } from '../modules/reports/report.openapi';
+import { roleParameters, rolePaths, roleSchemas } from '../modules/roles/role.openapi';
+import { userPaths } from '../modules/users/user.openapi';
 
 const errorContent = {
   'application/json': { schema: { $ref: '#/components/schemas/Error' } },
@@ -51,6 +53,8 @@ export const openApiDocument = {
     { name: 'Assets' },
     { name: 'Reports' },
     { name: 'Audit Logs' },
+    { name: 'Roles' },
+    { name: 'Users' },
   ],
   paths: {
     '/health': {
@@ -85,6 +89,8 @@ export const openApiDocument = {
     ...assetPaths,
     ...reportPaths,
     ...auditLogPaths,
+    ...rolePaths,
+    ...userPaths,
   },
   components: {
     securitySchemes: {
@@ -99,6 +105,7 @@ export const openApiDocument = {
       ...paymentMethodParameters,
       ...addressParameters,
       ...reportParameters,
+      ...roleParameters,
     },
     responses: {
       BadRequest: { description: 'The request is invalid', content: errorContent },
@@ -125,6 +132,7 @@ export const openApiDocument = {
       ...assetSchemas,
       ...reportSchemas,
       ...auditLogSchemas,
+      ...roleSchemas,
       PageMeta: {
         type: 'object',
         required: ['page', 'limit', 'total'],

@@ -26,7 +26,7 @@ export const reportPaths = {
   '/api/reports/summary': {
     get: {
       tags,
-      summary: 'Get sales totals for a date range (admin)',
+      summary: 'Get sales totals for a date range (needs reports.sales)',
       description:
         'Days follow Manila time, and both dates are included. Without dates, it covers the last 30 days. Totals use the amounts saved on each order, so changing the tax rate never changes past figures.',
       security,
@@ -40,7 +40,7 @@ export const reportPaths = {
   '/api/reports/sales': {
     get: {
       tags,
-      summary: 'Get sales per day, week, or month, for a chart (admin)',
+      summary: 'Get sales per day, week, or month, for a chart (needs reports.sales)',
       description:
         'Returns a point for every period, including empty ones. Weeks start on Monday, and each point is dated by the first day of its period. A daily report can cover up to 366 days.',
       security,
@@ -62,7 +62,7 @@ export const reportPaths = {
   '/api/reports/top-products': {
     get: {
       tags,
-      summary: 'Get the best-selling products (admin)',
+      summary: 'Get the best-selling products (needs reports.sales)',
       description:
         'Counts orders placed in the range, apart from cancelled ones. Variants are combined into their product, and inactive products are included.',
       security,
@@ -89,7 +89,7 @@ export const reportPaths = {
   '/api/reports/order-status': {
     get: {
       tags,
-      summary: 'Count orders by status, and what needs doing (admin)',
+      summary: 'Count orders by status, and what needs doing (needs reports.operations)',
       description: 'Shows every order as it is now, with no date range.',
       security,
       responses: {
@@ -103,7 +103,7 @@ export const reportPaths = {
   '/api/reports/low-stock': {
     get: {
       tags,
-      summary: 'List variants that are running out (admin)',
+      summary: 'List variants that are running out (needs reports.operations)',
       description: 'Only variants on sale are listed, lowest stock first.',
       security,
       parameters: [

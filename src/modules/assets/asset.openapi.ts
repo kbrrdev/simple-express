@@ -13,7 +13,7 @@ export const assetPaths = {
   '/api/assets': {
     get: {
       tags,
-      summary: 'List uploaded files, newest first (admin)',
+      summary: 'List uploaded files, newest first (needs assets.manage)',
       security,
       parameters: [
         { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
@@ -47,7 +47,7 @@ export const assetPaths = {
     },
     post: {
       tags,
-      summary: 'Upload an image (admin)',
+      summary: 'Upload an image (needs assets.manage)',
       description:
         'Accepts one JPEG, PNG, or WebP image of up to 5 MB. Attach it to a product or blog using the returned id.',
       security,
@@ -87,7 +87,7 @@ export const assetPaths = {
   '/api/assets/{id}': {
     delete: {
       tags,
-      summary: 'Delete an uploaded file (admin)',
+      summary: 'Delete an uploaded file (needs assets.manage)',
       description: 'Fails with 409 while a product or blog uses the asset.',
       security,
       parameters: [

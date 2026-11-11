@@ -184,7 +184,7 @@ export const orderPaths = {
   '/api/orders/admin': {
     get: {
       tags,
-      summary: 'List all orders (admin)',
+      summary: 'List all orders (needs orders.view)',
       security,
       parameters: [
         ...listParameters,
@@ -206,7 +206,7 @@ export const orderPaths = {
   '/api/orders/admin/{id}': {
     get: {
       tags,
-      summary: 'Get any order (admin)',
+      summary: 'Get any order (needs orders.view)',
       security,
       parameters: [orderId],
       responses: {
@@ -222,7 +222,7 @@ export const orderPaths = {
   '/api/orders/admin/{id}/status': {
     patch: {
       tags,
-      summary: 'Move an order to its next status (admin)',
+      summary: 'Move an order to its next status (needs orders.manage)',
       description:
         'Allowed moves: pending to confirmed or cancelled, confirmed to shipped or cancelled, and shipped to delivered or returned. Cancelling returns stock. Returning does not, as the item may be damaged. Delivering a COD order marks it paid.',
       security,
@@ -240,15 +240,15 @@ export const orderPaths = {
     },
   },
   '/api/orders/admin/{id}/payment/confirm': adminPaymentAction(
-    'Confirm a submitted payment (admin)',
+    'Confirm a submitted payment (needs orders.manage)',
     'Marks the order paid and moves it to pending.',
   ),
   '/api/orders/admin/{id}/payment/reject': adminPaymentAction(
-    'Reject a submitted payment (admin)',
+    'Reject a submitted payment (needs orders.manage)',
     'Cancels the order and returns its stock.',
   ),
   '/api/orders/admin/{id}/payment/refund': adminPaymentAction(
-    'Record a refund (admin)',
+    'Record a refund (needs orders.refund)',
     'Records a refund made outside the system. The order must be cancelled, returned, or delivered.',
   ),
   '/api/orders/{id}': {

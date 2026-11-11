@@ -83,27 +83,27 @@ To use another port, update `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
 
 ## Available Scripts
 
-| Script                             | Description                                         |
-| ---------------------------------- | --------------------------------------------------- |
-| `npm run dev`                      | Start development server with automatic reload      |
-| `npm run build`                    | Compile TypeScript to `dist/`                       |
-| `npm start`                        | Run the compiled application                        |
-| `npm run typecheck`                | Type-check without emitting files                   |
-| `npm run lint`                     | Run ESLint                                          |
-| `npm run lint:fix`                 | Automatically fix ESLint issues                     |
-| `npm run format`                   | Format code with Prettier                           |
-| `npm run format:check`             | Check code formatting                               |
-| `npm run db:generate`              | Generate migrations from schema changes             |
-| `npm run db:migrate`               | Apply pending migrations                            |
-| `npm run db:studio`                | Open Drizzle Studio                                 |
-| `npm run db:make-admin -- <email>` | Make an existing user an admin                      |
-| `npm run db:seed`                  | Fill an empty database with sample data             |
-| `npm run postman`                  | Regenerate the Postman collection                   |
-| `npm run email:test -- <email>`    | Send a test email                                   |
-| `npm run docker:watch`             | Run Docker development environment with live reload |
-| `npm run docker:down`              | Stop Docker development containers                  |
-| `npm run test:db`                  | Start the disposable test database                  |
-| `npm test`                         | Start the test database and run the test suite      |
+| Script                                  | Description                                         |
+| --------------------------------------- | --------------------------------------------------- |
+| `npm run dev`                           | Start development server with automatic reload      |
+| `npm run build`                         | Compile TypeScript to `dist/`                       |
+| `npm start`                             | Run the compiled application                        |
+| `npm run typecheck`                     | Type-check without emitting files                   |
+| `npm run lint`                          | Run ESLint                                          |
+| `npm run lint:fix`                      | Automatically fix ESLint issues                     |
+| `npm run format`                        | Format code with Prettier                           |
+| `npm run format:check`                  | Check code formatting                               |
+| `npm run db:generate`                   | Generate migrations from schema changes             |
+| `npm run db:migrate`                    | Apply pending migrations                            |
+| `npm run db:studio`                     | Open Drizzle Studio                                 |
+| `npm run db:set-role -- <email> <role>` | Give a user a role, or `customer` to remove it      |
+| `npm run db:seed`                       | Fill an empty database with sample data             |
+| `npm run postman`                       | Regenerate the Postman collection                   |
+| `npm run email:test -- <email>`         | Send a test email                                   |
+| `npm run docker:watch`                  | Run Docker development environment with live reload |
+| `npm run docker:down`                   | Stop Docker development containers                  |
+| `npm run test:db`                       | Start the disposable test database                  |
+| `npm test`                              | Start the test database and run the test suite      |
 
 ## API Documentation
 
@@ -148,7 +148,9 @@ src/
     ├── orders/
     ├── payment-methods/
     ├── products/
-    └── reports/
+    ├── reports/
+    ├── roles/
+    └── users/
 
 docs/
 drizzle/
@@ -213,12 +215,13 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds an admin and a customer, nested categories, products with variants and images, payment methods, blogs, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
-| Email                  | Role     | Password           |
-| ---------------------- | -------- | ------------------ |
-| `admin@example.com`    | Admin    | `dev-password-123` |
-| `customer@example.com` | Customer | `dev-password-123` |
+| Email                  | Role        | Password           |
+| ---------------------- | ----------- | ------------------ |
+| `admin@example.com`    | Super admin | `dev-password-123` |
+| `staff@example.com`    | Staff       | `dev-password-123` |
+| `customer@example.com` | Customer    | `dev-password-123` |
 
 The seed refuses to run in production, or when the database already has users. To seed again, reset the database and run the migrations first:
 
@@ -310,21 +313,63 @@ Forgotten passwords are reset by email. The link opens `PASSWORD_RESET_URL`, a p
 
 To protect a route, add the `requireAuth` middleware. The current user is then available in `res.locals.auth`.
 
-Users are either a `customer` or an `admin`, and new users are always customers. To restrict a route to admins, add `requireAdmin` after `requireAuth`.
+### Roles and Permissions
 
-There is no API for changing roles. Register the user, then promote them from the command line:
+New users are customers, with no role. Staff accounts get a role, and each role is a set of permissions:
+
+| Permission               | Allows                                                                    |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `orders.view`            | List and view any order                                                   |
+| `orders.manage`          | Change order status, and confirm or reject payments                       |
+| `orders.refund`          | Record refunds                                                            |
+| `products.view`          | See all products and variants, including inactive ones                    |
+| `products.manage`        | Create and edit products, prices, variants, and images, and turn them off |
+| `inventory.manage`       | Change variant stock only                                                 |
+| `categories.manage`      | Create, edit, and delete categories                                       |
+| `blogs.manage`           | Write blogs and read drafts                                               |
+| `assets.manage`          | List, upload, and delete files                                            |
+| `payment_methods.manage` | Manage payment methods and see account numbers                            |
+| `reports.operations`     | Order status and low stock reports                                        |
+| `reports.sales`          | Sales summary, chart, and top products                                    |
+| `audit_logs.view`        | Read the audit log                                                        |
+
+The migration creates three roles:
+
+- **Super admin** has every permission, including ones added later, and is the only role that manages roles. It cannot be changed or deleted.
+- **Admin** has every permission above. Existing admins were moved to this role.
+- **Staff** handles orders and stock: `orders.view`, `orders.manage`, `products.view`, `inventory.manage`, `assets.manage`, and `reports.operations`.
+
+Super admins can change Admin and Staff, and create roles of their own:
+
+| Endpoint                     | Description                                           |
+| ---------------------------- | ----------------------------------------------------- |
+| `GET /api/roles/permissions` | List every permission with its description            |
+| `GET /api/roles`             | List roles, with their permissions and user count     |
+| `POST /api/roles`            | Create a role                                         |
+| `GET /api/roles/:id`         | Get a role                                            |
+| `PATCH /api/roles/:id`       | Rename a role or replace its permissions              |
+| `DELETE /api/roles/:id`      | Delete a role that no user has                        |
+| `PATCH /api/users/:id/role`  | Give a user a role, or `null` to make them a customer |
+
+- Permissions are read on every request, so changes apply immediately, even to tokens already issued.
+- Super admins cannot change their own role, so the store always keeps at least one.
+- Managing roles is not a permission, so nobody can grant themselves more access.
+- `GET /api/auth/me` returns the user's `role` and `permissions`, so a frontend can hide what they cannot use.
+- Every change to a role or to a user's role is recorded in the [audit log](#audit-logs).
+
+To protect a route, add `requirePermission('orders.view')` after `requireAuth`. A new feature adds its permission to `src/modules/roles/permissions.ts`, and super admins then add it to the roles that need it.
+
+Make the first super admin from the command line, after they register:
 
 ```bash
-npm run db:make-admin -- jane@example.com
+npm run db:set-role -- jane@example.com "Super admin"
 ```
 
-In the production container, run `docker compose exec api node dist/db/make-admin.js jane@example.com`.
-
-Every role change is recorded in the [audit log](#audit-logs).
+In the production container, run `docker compose exec api node dist/db/set-role.js jane@example.com "Super admin"`. Use `customer` as the role to remove one.
 
 ## Blogs
 
-Published blogs are public to read, and drafts are hidden from the public, including by direct link. Only admins can create, update, and delete blogs, and they can read drafts through `GET /api/blogs/admin` and `GET /api/blogs/admin/:id`.
+Published blogs are public to read, and drafts are hidden from the public, including by direct link. Users with `blogs.manage` can create, update, and delete blogs, and read drafts through `GET /api/blogs/admin` and `GET /api/blogs/admin/:id`.
 
 ## Products
 
@@ -347,24 +392,24 @@ A product with no options still has one variant, without any option values. Pric
 
 Categories can be nested up to three levels, such as Men › Shoes › Running, and products can belong to any level. Set `parentId` to place a category under another, or `null` for a top-level one. Changing it moves the category with everything below it. Names must be unique among categories with the same parent, so Men › Shoes and Women › Shoes can both exist. A category can also have an image, set with `imageAssetId` after uploading it to `/api/assets`.
 
-| Endpoint                                       | Description                                  | Access |
-| ---------------------------------------------- | -------------------------------------------- | ------ |
-| `GET /api/categories`                          | List categories                              | Public |
-| `GET /api/categories/tree`                     | Get every category, nested                   | Public |
-| `GET /api/categories/:id`                      | Get a category and the categories above it   | Public |
-| `POST /api/categories`                         | Create a category                            | Admin  |
-| `PATCH /api/categories/:id`                    | Rename, move, or change a category's image   | Admin  |
-| `DELETE /api/categories/:id`                   | Delete an empty category                     | Admin  |
-| `GET /api/products`                            | List products on sale                        | Public |
-| `GET /api/products/:id`                        | Get a product on sale                        | Public |
-| `GET /api/products/admin`                      | List all products, including inactive ones   | Admin  |
-| `GET /api/products/admin/:id`                  | Get any product, including inactive variants | Admin  |
-| `POST /api/products`                           | Create a product and its variants            | Admin  |
-| `PATCH /api/products/:id`                      | Update a product                             | Admin  |
-| `DELETE /api/products/:id`                     | Deactivate a product                         | Admin  |
-| `POST /api/products/:id/variants`              | Add a variant                                | Admin  |
-| `PATCH /api/products/:id/variants/:variantId`  | Update a variant                             | Admin  |
-| `DELETE /api/products/:id/variants/:variantId` | Deactivate a variant                         | Admin  |
+| Endpoint                                       | Description                                  | Access                                                  |
+| ---------------------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `GET /api/categories`                          | List categories                              | Public                                                  |
+| `GET /api/categories/tree`                     | Get every category, nested                   | Public                                                  |
+| `GET /api/categories/:id`                      | Get a category and the categories above it   | Public                                                  |
+| `POST /api/categories`                         | Create a category                            | `categories.manage`                                     |
+| `PATCH /api/categories/:id`                    | Rename, move, or change a category's image   | `categories.manage`                                     |
+| `DELETE /api/categories/:id`                   | Delete an empty category                     | `categories.manage`                                     |
+| `GET /api/products`                            | List products on sale                        | Public                                                  |
+| `GET /api/products/:id`                        | Get a product on sale                        | Public                                                  |
+| `GET /api/products/admin`                      | List all products, including inactive ones   | `products.view`                                         |
+| `GET /api/products/admin/:id`                  | Get any product, including inactive variants | `products.view`                                         |
+| `POST /api/products`                           | Create a product and its variants            | `products.manage`                                       |
+| `PATCH /api/products/:id`                      | Update a product                             | `products.manage`                                       |
+| `DELETE /api/products/:id`                     | Deactivate a product                         | `products.manage`                                       |
+| `POST /api/products/:id/variants`              | Add a variant                                | `products.manage`                                       |
+| `PATCH /api/products/:id/variants/:variantId`  | Update a variant                             | `products.manage`, or `inventory.manage` for stock only |
+| `DELETE /api/products/:id/variants/:variantId` | Deactivate a variant                         | `products.manage`                                       |
 
 Product lists support `page`, `limit`, `search`, `categoryId`, and `sort` (`newest` or `name`). Filtering by a category includes its subcategories.
 
@@ -400,23 +445,23 @@ A merge keeps the higher quantity for an item in both carts, so retrying one is 
 
 Customers check out with cash on delivery or a manual payment method, and guests can check out without an account. Tax and shipping are added at checkout, and an order keeps its own copy of its prices and address, so later changes never alter it.
 
-| Endpoint                                     | Description                             | Access       |
-| -------------------------------------------- | --------------------------------------- | ------------ |
-| `POST /api/orders/preview`                   | Price items with shipping and tax       | Public       |
-| `POST /api/orders`                           | Check out the cart                      | Customer     |
-| `GET /api/orders`                            | List your orders                        | Customer     |
-| `GET /api/orders/:id`                        | Get one of your orders                  | Customer     |
-| `POST /api/orders/:id/payment`               | Submit a payment reference              | Customer     |
-| `POST /api/orders/:id/cancel`                | Cancel a pending or unpaid order        | Customer     |
-| `POST /api/orders/guest`                     | Check out as a guest                    | Public       |
-| `GET /api/orders/guest/:token`               | View a guest order                      | Private link |
-| `POST /api/orders/guest/:token/payment`      | Submit a payment reference              | Private link |
-| `GET /api/orders/admin`                      | List all orders                         | Admin        |
-| `GET /api/orders/admin/:id`                  | Get any order                           | Admin        |
-| `PATCH /api/orders/admin/:id/status`         | Move an order to its next status        | Admin        |
-| `POST /api/orders/admin/:id/payment/confirm` | Confirm a submitted payment             | Admin        |
-| `POST /api/orders/admin/:id/payment/reject`  | Reject a payment, cancelling the order  | Admin        |
-| `POST /api/orders/admin/:id/payment/refund`  | Record a refund made outside the system | Admin        |
+| Endpoint                                     | Description                             | Access          |
+| -------------------------------------------- | --------------------------------------- | --------------- |
+| `POST /api/orders/preview`                   | Price items with shipping and tax       | Public          |
+| `POST /api/orders`                           | Check out the cart                      | Customer        |
+| `GET /api/orders`                            | List your orders                        | Customer        |
+| `GET /api/orders/:id`                        | Get one of your orders                  | Customer        |
+| `POST /api/orders/:id/payment`               | Submit a payment reference              | Customer        |
+| `POST /api/orders/:id/cancel`                | Cancel a pending or unpaid order        | Customer        |
+| `POST /api/orders/guest`                     | Check out as a guest                    | Public          |
+| `GET /api/orders/guest/:token`               | View a guest order                      | Private link    |
+| `POST /api/orders/guest/:token/payment`      | Submit a payment reference              | Private link    |
+| `GET /api/orders/admin`                      | List all orders                         | `orders.view`   |
+| `GET /api/orders/admin/:id`                  | Get any order                           | `orders.view`   |
+| `PATCH /api/orders/admin/:id/status`         | Move an order to its next status        | `orders.manage` |
+| `POST /api/orders/admin/:id/payment/confirm` | Confirm a submitted payment             | `orders.manage` |
+| `POST /api/orders/admin/:id/payment/reject`  | Reject a payment, cancelling the order  | `orders.manage` |
+| `POST /api/orders/admin/:id/payment/refund`  | Record a refund made outside the system | `orders.refund` |
 
 ### Checking Out
 
@@ -444,13 +489,13 @@ Checkout takes a `paymentMethod`, which is `cod` or the ID of a manual method. G
 
 Admins manage the manual methods, so GCash, Maya, banks, and PayPal can be added without code changes:
 
-| Endpoint                          | Description                                   | Access |
-| --------------------------------- | --------------------------------------------- | ------ |
-| `GET /api/payment-methods`        | List enabled methods, without account details | Public |
-| `GET /api/payment-methods/admin`  | List all methods with account details         | Admin  |
-| `POST /api/payment-methods`       | Add a method                                  | Admin  |
-| `PATCH /api/payment-methods/:id`  | Update or turn off a method                   | Admin  |
-| `DELETE /api/payment-methods/:id` | Delete a method no order has used             | Admin  |
+| Endpoint                          | Description                                   | Access                   |
+| --------------------------------- | --------------------------------------------- | ------------------------ |
+| `GET /api/payment-methods`        | List enabled methods, without account details | Public                   |
+| `GET /api/payment-methods/admin`  | List all methods with account details         | `payment_methods.manage` |
+| `POST /api/payment-methods`       | Add a method                                  | `payment_methods.manage` |
+| `PATCH /api/payment-methods/:id`  | Update or turn off a method                   | `payment_methods.manage` |
+| `DELETE /api/payment-methods/:id` | Delete a method no order has used             | `payment_methods.manage` |
 
 ```json
 {
@@ -516,7 +561,7 @@ To use a courier's rates, change `calculateShipping` in `order.service.ts`, whic
 
 ## Reports
 
-Admins get dashboard data from these endpoints. Each one feeds one part of a dashboard.
+These endpoints feed an admin dashboard, one part each. `summary`, `sales`, and `top-products` need `reports.sales`, and `order-status` and `low-stock` need `reports.operations`.
 
 | Endpoint                        | Dashboard part   | Returns                                                                     |
 | ------------------------------- | ---------------- | --------------------------------------------------------------------------- |
@@ -536,10 +581,10 @@ Reports use the amounts saved on each order, so changing the tax rate never chan
 
 ## Audit Logs
 
-`GET /api/audit-logs` lists changes, newest first, for admins only. It records:
+`GET /api/audit-logs` lists changes, newest first, and needs `audit_logs.view`. It records:
 
 - Admin changes to products, variants (including stock), product images, categories, blogs, payment methods, files, and orders.
-- Password changes, password resets, signing out everywhere, and role changes.
+- Password changes, password resets, signing out everywhere, role changes, and changes to roles.
 
 Customer carts, addresses, and checkouts are not recorded. The request logs cover them.
 
@@ -549,7 +594,7 @@ Each entry has the user who made the change, the entity, an `action` such as `cr
 { "action": "update", "entityType": "variant", "changes": { "priceCents": [4500, 3900] } }
 ```
 
-- `actorUserId` is `null` for scripts, such as `db:make-admin`.
+- `actorUserId` is `null` for scripts, such as `db:set-role`.
 - `requestId` matches the `requestId` in the server logs.
 - Account numbers and password hashes show as `[redacted]`.
 
@@ -592,7 +637,7 @@ A user's first address becomes the default. Deleting the default makes the newes
 
 ## Assets
 
-All uploaded files are stored in one `assets` table, and products, variants, categories, blogs, and payment methods point to it. Only admins can upload, and anyone can view uploaded files.
+All uploaded files are stored in one `assets` table, and products, variants, categories, blogs, and payment methods point to it. Uploading needs `assets.manage`, and anyone can view uploaded files.
 
 Attaching an image takes two steps:
 

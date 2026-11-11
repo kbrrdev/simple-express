@@ -15,6 +15,8 @@ import { AppError } from '../../lib/app-error';
 import { sendEmail } from '../../lib/email';
 import { logger } from '../../lib/logger';
 import { recordAudit } from '../audit-logs/audit-log.service';
+import { resolvePermissions, type Permission } from '../roles/permissions';
+import { roles } from '../roles/role.schema';
 import { loginAttempts, passwordResets, sessions, users } from './auth.schema';
 import type { ChangePasswordBody, RegisterBody, ResetPasswordBody } from './auth.validation';
 
@@ -36,9 +38,17 @@ const argon2Options = { parallelism: 1, tagLength: 32, memory: 19456, passes: 2 
 const publicUser = {
   id: users.id,
   email: users.email,
-  role: users.role,
   createdAt: users.createdAt,
 };
+
+/**
+ * The permissions of the user's role, read in the same query as the user. The names are
+ * written out, as Drizzle leaves out table names when a query reads one table, and a bare
+ * `role_id` would then match the subquery's own column and grant every role's permissions.
+ */
+const grantedPermissions = sql<Permission[] | null>`(
+  select array_agg(rp.permission) from role_permissions rp where rp.role_id = "users"."role_id"
+)`;
 
 async function hashPassword(password: string) {
   const nonce = randomBytes(16);
@@ -100,7 +110,7 @@ export async function register({ email, password }: RegisterBody) {
     .returning(publicUser);
 
   if (!user) throw new AppError(409, 'Email is already registered');
-  return user;
+  return { ...user, role: null, permissions: [] };
 }
 
 async function assertLoginAllowed(email: string) {
@@ -176,7 +186,7 @@ export async function login({ email, password }: RegisterBody) {
   if (!session) throw new AppError(500, 'Failed to create session');
 
   return {
-    user: { id: user.id, email: user.email, role: user.role, createdAt: user.createdAt },
+    user: await getUser(user.id),
     accessToken: createAccessToken(user.id, session.id),
     refreshToken,
   };
@@ -261,7 +271,7 @@ export async function verifyAccessToken(token: string) {
   }
 
   const [session] = await db
-    .select({ id: sessions.id, role: users.role })
+    .select({ id: sessions.id, roleId: users.roleId, permissions: grantedPermissions })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(
@@ -275,7 +285,12 @@ export async function verifyAccessToken(token: string) {
 
   if (!session) throw new AppError(401, 'Invalid or expired access token');
 
-  return { userId: payload.sub, sessionId: session.id, role: session.role };
+  return {
+    userId: payload.sub,
+    sessionId: session.id,
+    roleId: session.roleId,
+    permissions: resolvePermissions(session.roleId, session.permissions),
+  };
 }
 
 export async function logout(sessionId: string) {
@@ -441,8 +456,24 @@ export async function resetPassword({ token, newPassword }: ResetPasswordBody) {
 }
 
 export async function getUser(userId: string) {
-  const [user] = await db.select(publicUser).from(users).where(eq(users.id, userId));
+  const [user] = await db
+    .select({
+      ...publicUser,
+      roleName: roles.name,
+      roleId: users.roleId,
+      granted: grantedPermissions,
+    })
+    .from(users)
+    .leftJoin(roles, eq(users.roleId, roles.id))
+    .where(eq(users.id, userId));
 
   if (!user) throw new AppError(401, 'Invalid or expired access token');
-  return user;
+
+  const { roleId, roleName, granted, ...rest } = user;
+
+  return {
+    ...rest,
+    role: roleId && roleName ? { id: roleId, name: roleName } : null,
+    permissions: resolvePermissions(roleId, granted),
+  };
 }

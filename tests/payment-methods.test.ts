@@ -4,7 +4,14 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { db, pool } from '../src/db';
-import { categories, orders, products, productVariants, users } from '../src/db/schema';
+import {
+  categories,
+  orders,
+  products,
+  productVariants,
+  SUPER_ADMIN_ROLE_ID,
+  users,
+} from '../src/db/schema';
 import { guestOrderLimiter } from '../src/modules/orders/order.routes';
 import { expireUnpaidOrders } from '../src/modules/orders/order.service';
 
@@ -117,7 +124,10 @@ beforeAll(async () => {
   await db.execute(sql`truncate table users, sessions cascade`);
 
   adminToken = await registerAndLogin('admin@example.com');
-  await db.update(users).set({ role: 'admin' }).where(eq(users.email, 'admin@example.com'));
+  await db
+    .update(users)
+    .set({ roleId: SUPER_ADMIN_ROLE_ID })
+    .where(eq(users.email, 'admin@example.com'));
   token = await registerAndLogin('customer@example.com');
 });
 

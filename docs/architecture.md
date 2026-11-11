@@ -109,6 +109,8 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/payment-methods` | Payment methods module        |
 | `/api/products`        | Products module               |
 | `/api/reports`         | Reports module                |
+| `/api/roles`           | Roles module                  |
+| `/api/users`           | Users module                  |
 
 ## Database
 
@@ -128,8 +130,7 @@ Central route registration. Module routes are mounted under `/api`.
 - The `requireAuth` middleware checks the session on every protected request, so revoking a session takes effect immediately.
 - Refresh tokens rotate on each use. A correctly signed token that is no longer current revokes its session, apart from the previous token, which is allowed for 30 seconds. Forged tokens are rejected without touching the session.
 - Web clients receive the refresh token as an `httpOnly` cookie, and native clients receive it in the response body.
-- Users are a `customer` or an `admin`. `requireAuth` reads the role from the database on every request, so role changes apply immediately. `requireAdmin` runs after it and returns `403` for non-admins.
-- Roles can only be changed with the `db:make-admin` script, not through the API.
+- Customers have no role. Staff users have one role, through `users.role_id`. See Roles and Permissions below.
 - Passwords are hashed with Argon2id using Node's built-in `crypto` module.
 - New passwords are checked against a bundled list of common passwords. Changing a password keeps the current session and revokes the others.
 - Password reset emails a link to `PASSWORD_RESET_URL` with `#token=...`, as fragments are never sent to servers or logged. Only the token's SHA-256 hash is stored in `password_resets`.
@@ -138,9 +139,21 @@ Central route registration. Module routes are mounted under `/api`.
 - Login, registration, password changes, and token refresh are rate limited per IP address, in memory.
 - Failed logins are also tracked per email in `login_attempts`, including unknown emails. After five failures, the email is delayed for 30 seconds, doubling up to five minutes.
 
+## Roles and Permissions
+
+- Permissions are a fixed list in `src/modules/roles/permissions.ts`, as each one guards specific routes. A new feature adds its own.
+- Roles are data in `roles` and `role_permissions`, so super admins can change them and create new ones without a deploy.
+- Super admin is a built-in role with a fixed ID. It has every permission, including ones added later, and cannot be changed or deleted.
+- `requireAuth` reads the user's permissions in the same query that checks the session, so changes apply on the next request. That subquery names its tables in plain SQL, because Drizzle leaves table names out of single-table queries and a bare `role_id` would match the subquery's own column.
+- `requirePermission` guards each admin route. Changing only a variant's stock needs `inventory.manage`, and any other change needs `products.manage`.
+- Managing roles uses `requireSuperAdmin` and is not a permission, so nobody can grant themselves more access.
+- Role changes and role assignments take an advisory lock. Assigning a role checks again under the lock that the actor is still a super admin, and super admins cannot change their own role, so two super admins cannot remove each other and leave none.
+- A role that users have cannot be deleted, as `users.role_id` restricts it.
+- `db:set-role` assigns roles from the command line, and is how the first super admin is made.
+
 ## Blogs
 
-Published blogs are public to read, and drafts are hidden, including by direct link. Only admins can write blogs or read drafts.
+Published blogs are public to read, and drafts are hidden, including by direct link. Writing blogs and reading drafts need `blogs.manage`.
 
 ## Categories
 
@@ -207,7 +220,7 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - The actor and `requestId` come from the request context, so services do not pass them. Scripts have no actor.
 - `changes` holds each changed field as `[before, after]`. `accountNumber` and `passwordHash` are replaced with `[redacted]`.
 - `migrate.ts` revokes `UPDATE` and `DELETE` on `audit_logs` from the API's role, so history can only be added to.
-- `db:make-admin` records any role change, so admin levels added later are covered.
+- Role changes are recorded by role name, from both the API and `db:set-role`.
 
 ## Addresses
 

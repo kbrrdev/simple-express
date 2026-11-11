@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   gte,
+  isNull,
   lt,
   lte,
   ne,
@@ -105,7 +106,7 @@ export async function getSummary(query: DateRangeQuery) {
     db
       .select({ newCustomers: count() })
       .from(users)
-      .where(and(eq(users.role, 'customer'), inRange(users.createdAt, range))),
+      .where(and(isNull(users.roleId), inRange(users.createdAt, range))),
     // Each order keeps the rate it was placed with, so a rate change shows as a second row.
     db
       .select({

@@ -53,7 +53,7 @@ export const paymentMethodPaths = {
     },
     post: {
       tags,
-      summary: 'Add a payment method (admin)',
+      summary: 'Add a payment method (needs payment_methods.manage)',
       description: 'Upload a QR image through /api/assets first, then send its id as qrAssetId.',
       security,
       requestBody: jsonBody('CreatePaymentMethod'),
@@ -70,7 +70,7 @@ export const paymentMethodPaths = {
   '/api/payment-methods/admin': {
     get: {
       tags,
-      summary: 'List all payment methods with account details (admin)',
+      summary: 'List all payment methods with account details (needs payment_methods.manage)',
       security,
       responses: {
         200: { description: 'All methods', content: pageContent('PaymentMethod') },
@@ -83,7 +83,7 @@ export const paymentMethodPaths = {
   '/api/payment-methods/{id}': {
     patch: {
       tags,
-      summary: 'Update a payment method (admin)',
+      summary: 'Update a payment method (needs payment_methods.manage)',
       description: 'Orders already placed keep the details they were given.',
       security,
       parameters: [paymentMethodId],
@@ -100,7 +100,7 @@ export const paymentMethodPaths = {
     },
     delete: {
       tags,
-      summary: 'Delete a payment method (admin)',
+      summary: 'Delete a payment method (needs payment_methods.manage)',
       description: 'Fails with 409 once orders use it. Set enabled to false instead.',
       security,
       parameters: [paymentMethodId],

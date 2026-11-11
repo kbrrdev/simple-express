@@ -29,11 +29,12 @@ import {
   updateVariant,
 } from '../modules/products/product.service';
 import { db, pool } from './index';
-import { users } from './schema';
+import { roles, SUPER_ADMIN_ROLE_ID, users } from './schema';
 
 // Development data only, so a shared password is fine. Production is refused below.
 const PASSWORD = 'dev-password-123';
 const ADMIN_EMAIL = 'admin@example.com';
+const STAFF_EMAIL = 'staff@example.com';
 const CUSTOMER_EMAIL = 'customer@example.com';
 
 // A 1x1 PNG, enough for every image to have a working file.
@@ -101,7 +102,14 @@ async function main() {
   }
 
   const admin = await register({ email: ADMIN_EMAIL, password: PASSWORD });
-  await db.update(users).set({ role: 'admin' }).where(eq(users.id, admin.id));
+  await db.update(users).set({ roleId: SUPER_ADMIN_ROLE_ID }).where(eq(users.id, admin.id));
+
+  const staff = await register({ email: STAFF_EMAIL, password: PASSWORD });
+  const [staffRole] = await db.select({ id: roles.id }).from(roles).where(eq(roles.name, 'Staff'));
+  await db
+    .update(users)
+    .set({ roleId: staffRole?.id ?? null })
+    .where(eq(users.id, staff.id));
   const customer = await register({ email: CUSTOMER_EMAIL, password: PASSWORD });
 
   const home = await createAddress(customer.id, address);

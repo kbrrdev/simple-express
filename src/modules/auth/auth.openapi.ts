@@ -1,3 +1,5 @@
+import { allPermissions } from '../roles/permissions';
+
 const badRequest = { $ref: '#/components/responses/BadRequest' };
 const unauthorized = { $ref: '#/components/responses/Unauthorized' };
 const tooManyRequests = { $ref: '#/components/responses/TooManyRequests' };
@@ -229,11 +231,24 @@ export const authPaths = {
 export const authSchemas = {
   User: {
     type: 'object',
-    required: ['id', 'email', 'role', 'createdAt'],
+    required: ['id', 'email', 'role', 'permissions', 'createdAt'],
     properties: {
       id: { type: 'string', format: 'uuid' },
       email: { type: 'string', format: 'email', example: 'jane@example.com' },
-      role: { type: 'string', enum: ['customer', 'admin'], example: 'customer' },
+      role: {
+        type: ['object', 'null'],
+        description: 'Null for customers',
+        required: ['id', 'name'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string', example: 'Staff' },
+        },
+      },
+      permissions: {
+        type: 'array',
+        description: 'What the user can do, for hiding what they cannot. Empty for customers.',
+        items: { type: 'string', enum: allPermissions },
+      },
       createdAt: { type: 'string', format: 'date-time' },
     },
   },

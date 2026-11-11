@@ -7,11 +7,12 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { env } from '../src/config/env';
 import { db, pool } from '../src/db';
-import { loginAttempts, sessions, users } from '../src/db/schema';
+import { loginAttempts, roles, sessions, SUPER_ADMIN_ROLE_ID, users } from '../src/db/schema';
 import { errorHandler } from '../src/middleware/error-handler';
-import { requireAdmin, requireAuth } from '../src/middleware/require-auth';
+import { requireAuth, requirePermission, requireSuperAdmin } from '../src/middleware/require-auth';
 import { credentialsLimiter, refreshLimiter } from '../src/modules/auth/auth.routes';
 import { REFRESH_GRACE_PERIOD_MS } from '../src/modules/auth/auth.service';
+import { allPermissions } from '../src/modules/roles/permissions';
 
 const credentials = { email: 'jane@example.com', password: 'correct-horse-battery' };
 const blog = { title: 'Hello', content: 'First post', author: 'Jane' };
@@ -56,62 +57,86 @@ afterAll(async () => {
 
 describe('roles', () => {
   const adminApp = express();
-  adminApp.get('/admin', requireAuth, requireAdmin, (_req, res) => {
+  adminApp.get('/orders', requireAuth, requirePermission('orders.view'), (_req, res) => {
+    res.json({ data: 'ok' });
+  });
+  adminApp.get('/roles', requireAuth, requireSuperAdmin, (_req, res) => {
     res.json({ data: 'ok' });
   });
   adminApp.use(errorHandler);
 
-  const getAdmin = (token: string) => request(adminApp).get('/admin').set(bearer(token));
-  const setRole = (role: 'customer' | 'admin') =>
-    db.update(users).set({ role }).where(eq(users.email, credentials.email));
+  const getOrders = (token: string) => request(adminApp).get('/orders').set(bearer(token));
+  const getRoles = (token: string) => request(adminApp).get('/roles').set(bearer(token));
+  const setRole = (roleId: string | null) =>
+    db.update(users).set({ roleId }).where(eq(users.email, credentials.email));
 
-  it('makes new users customers', async () => {
+  async function staffRoleId() {
+    const [role] = await db.select().from(roles).where(eq(roles.name, 'Staff'));
+    if (!role) throw new Error('Failed to find the Staff role');
+    return role.id;
+  }
+
+  it('makes new users customers, with no permissions', async () => {
     const { body } = await login();
     const me = await getMe(body.data.accessToken);
 
-    expect(body.data.user.role).toBe('customer');
-    expect(me.body.data.role).toBe('customer');
+    expect(body.data.user).toMatchObject({ role: null, permissions: [] });
+    expect(me.body.data).toMatchObject({ role: null, permissions: [] });
   });
 
   it('does not let a user choose their role when registering', async () => {
     const response = await api()
       .post('/api/auth/register')
-      .send({ email: 'sneaky@example.com', password: 'another-password', role: 'admin' });
+      .send({
+        email: 'sneaky@example.com',
+        password: 'another-password',
+        roleId: SUPER_ADMIN_ROLE_ID,
+      });
 
     expect(response.status).toBe(400);
   });
 
-  it('blocks customers from admin routes', async () => {
+  it('blocks users without the permission', async () => {
     const { body } = await login();
-    const response = await getAdmin(body.data.accessToken);
+    const response = await getOrders(body.data.accessToken);
 
     expect(response.status).toBe(403);
-    expect(response.body).toEqual({ error: { message: 'Admin access required' } });
+    expect(response.body).toEqual({ error: { message: 'You do not have permission to do this' } });
   });
 
-  it('requires a token on admin routes', async () => {
-    const response = await request(adminApp).get('/admin');
-
-    expect(response.status).toBe(401);
+  it('requires a token', async () => {
+    await request(adminApp).get('/orders').expect(401);
   });
 
-  it('lets admins through', async () => {
-    await setRole('admin');
+  it('lets a role through with its permissions only', async () => {
+    await setRole(await staffRoleId());
     const { body } = await login();
 
-    expect(body.data.user.role).toBe('admin');
-    await getAdmin(body.data.accessToken).expect(200);
+    expect(body.data.user.role.name).toBe('Staff');
+    expect(body.data.user.permissions).toContain('orders.view');
+    expect(body.data.user.permissions).not.toContain('orders.refund');
+    await getOrders(body.data.accessToken).expect(200);
+    await getRoles(body.data.accessToken).expect(403);
+  });
+
+  it('gives super admins every permission', async () => {
+    await setRole(SUPER_ADMIN_ROLE_ID);
+    const { body } = await login();
+
+    expect(body.data.user.permissions).toEqual(allPermissions);
+    await getOrders(body.data.accessToken).expect(200);
+    await getRoles(body.data.accessToken).expect(200);
   });
 
   it('applies role changes to access tokens already issued', async () => {
     const { body } = await login();
-    await getAdmin(body.data.accessToken).expect(403);
+    await getOrders(body.data.accessToken).expect(403);
 
-    await setRole('admin');
-    await getAdmin(body.data.accessToken).expect(200);
+    await setRole(await staffRoleId());
+    await getOrders(body.data.accessToken).expect(200);
 
-    await setRole('customer');
-    await getAdmin(body.data.accessToken).expect(403);
+    await setRole(null);
+    await getOrders(body.data.accessToken).expect(403);
   });
 });
 
@@ -123,7 +148,13 @@ describe('register', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.data.email).toBe('new@example.com');
-    expect(Object.keys(response.body.data).sort()).toEqual(['createdAt', 'email', 'id', 'role']);
+    expect(Object.keys(response.body.data).sort()).toEqual([
+      'createdAt',
+      'email',
+      'id',
+      'permissions',
+      'role',
+    ]);
   });
 
   it('stores a salted hash instead of the password', async () => {
@@ -641,7 +672,10 @@ describe('blogs', () => {
   });
 
   it('requires a token to create, update and delete', async () => {
-    await db.update(users).set({ role: 'admin' }).where(eq(users.email, credentials.email));
+    await db
+      .update(users)
+      .set({ roleId: SUPER_ADMIN_ROLE_ID })
+      .where(eq(users.email, credentials.email));
     const { accessToken } = (await login()).body.data;
     const created = await api().post('/api/blogs').set(bearer(accessToken)).send(blog).expect(201);
     const path = `/api/blogs/${created.body.data.id}`;

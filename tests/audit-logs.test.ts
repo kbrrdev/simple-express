@@ -6,7 +6,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { db, pool } from '../src/db';
-import { auditLogs, categories, orders, users } from '../src/db/schema';
+import { auditLogs, categories, orders, SUPER_ADMIN_ROLE_ID, users } from '../src/db/schema';
 
 const password = 'correct-horse-battery';
 
@@ -51,7 +51,7 @@ beforeAll(async () => {
   adminToken = await registerAndLogin('admin@example.com');
   const [admin] = await db
     .update(users)
-    .set({ role: 'admin' })
+    .set({ roleId: SUPER_ADMIN_ROLE_ID })
     .where(eq(users.email, 'admin@example.com'))
     .returning();
   if (!admin) throw new Error('Failed to find admin');
@@ -223,18 +223,18 @@ describe('recording changes', () => {
     expect(JSON.stringify(entries)).not.toContain('argon2');
   });
 
-  it('records role changes made by the make-admin script', async () => {
+  it('records role changes made by the set-role script', async () => {
     await api()
       .post('/api/auth/register')
       .send({ email: 'staff@example.com', password })
       .expect(201);
 
-    const result = runScript('src/db/make-admin.ts', ['staff@example.com']);
+    const result = runScript('src/db/set-role.ts', ['staff@example.com', 'staff']);
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
 
     // Running it again changes nothing, so nothing more is recorded.
-    expect(runScript('src/db/make-admin.ts', ['staff@example.com']).status).toBe(0);
+    expect(runScript('src/db/set-role.ts', ['staff@example.com', 'staff']).status).toBe(0);
 
     const [staff] = await db.select().from(users).where(eq(users.email, 'staff@example.com'));
     if (!staff) throw new Error('Failed to find staff');
@@ -247,7 +247,7 @@ describe('recording changes', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       actorUserId: null,
-      changes: { role: ['customer', 'admin'] },
+      changes: { role: [null, 'Staff'] },
     });
   }, 30000);
 });

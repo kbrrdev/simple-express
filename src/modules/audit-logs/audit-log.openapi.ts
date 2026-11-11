@@ -9,7 +9,7 @@ export const auditLogPaths = {
   '/api/audit-logs': {
     get: {
       tags,
-      summary: 'List changes made by admins and to accounts, newest first (admin)',
+      summary: 'List changes made by admins and to accounts, newest first (needs audit_logs.view)',
       description:
         'Records admin changes to products, variants, images, categories, blogs, payment methods, files, and orders, and changes to passwords, sessions, and roles. Entries cannot be edited or deleted. Dates follow Manila time, and both are included.',
       security,

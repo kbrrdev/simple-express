@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { requireAdmin, requireAuth } from '../../middleware/require-auth';
+import { Router, type RequestHandler } from 'express';
+import { requireAuth, requirePermission } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './product.controller';
 import {
@@ -17,11 +17,18 @@ import {
 
 export const productRoutes = Router();
 
+/** Changing only stock needs `inventory.manage`, so staff can count stock without changing prices. */
+const canUpdateVariant: RequestHandler = (req, res, next) => {
+  const onlyStock = Object.keys(req.body as object).every((field) => field === 'stock');
+
+  return requirePermission(onlyStock ? 'inventory.manage' : 'products.manage')(req, res, next);
+};
+
 productRoutes.get('/', validate('query', listProductsQuery), controller.list);
 productRoutes.post(
   '/',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('body', createProductBody),
   controller.create,
 );
@@ -29,14 +36,14 @@ productRoutes.post(
 productRoutes.get(
   '/admin',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.view'),
   validate('query', listProductsQuery),
   controller.listForAdmin,
 );
 productRoutes.get(
   '/admin/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.view'),
   validate('params', productParams),
   controller.getForAdmin,
 );
@@ -44,7 +51,7 @@ productRoutes.get('/:id', validate('params', productParams), controller.get);
 productRoutes.patch(
   '/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('params', productParams),
   validate('body', updateProductBody),
   controller.update,
@@ -52,14 +59,14 @@ productRoutes.patch(
 productRoutes.delete(
   '/:id',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('params', productParams),
   controller.remove,
 );
 productRoutes.post(
   '/:id/images',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('params', productParams),
   validate('body', addImageBody),
   controller.addImage,
@@ -67,7 +74,7 @@ productRoutes.post(
 productRoutes.patch(
   '/:id/images/:imageId',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('params', imageParams),
   validate('body', updateImageBody),
   controller.updateImage,
@@ -75,14 +82,14 @@ productRoutes.patch(
 productRoutes.delete(
   '/:id/images/:imageId',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('params', imageParams),
   controller.removeImage,
 );
 productRoutes.post(
   '/:id/variants',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('params', productParams),
   validate('body', variantBody),
   controller.addVariant,
@@ -90,15 +97,15 @@ productRoutes.post(
 productRoutes.patch(
   '/:id/variants/:variantId',
   requireAuth,
-  requireAdmin,
   validate('params', variantParams),
   validate('body', updateVariantBody),
+  canUpdateVariant,
   controller.updateVariant,
 );
 productRoutes.delete(
   '/:id/variants/:variantId',
   requireAuth,
-  requireAdmin,
+  requirePermission('products.manage'),
   validate('params', variantParams),
   controller.removeVariant,
 );

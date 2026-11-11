@@ -82,7 +82,7 @@ export const productPaths = {
     },
     post: {
       tags,
-      summary: 'Create a product and its variants (admin)',
+      summary: 'Create a product and its variants (needs products.manage)',
       security,
       requestBody: jsonBody('CreateProduct'),
       responses: {
@@ -104,7 +104,7 @@ export const productPaths = {
   '/api/products/admin': {
     get: {
       tags,
-      summary: 'List all products, including inactive ones (admin)',
+      summary: 'List all products, including inactive ones (needs products.view)',
       security,
       parameters: listParameters,
       responses: {
@@ -119,7 +119,7 @@ export const productPaths = {
   '/api/products/admin/{id}': {
     get: {
       tags,
-      summary: 'Get any product, including inactive ones and their variants (admin)',
+      summary: 'Get any product, including inactive ones and their variants (needs products.view)',
       security,
       parameters: [productId],
       responses: {
@@ -146,7 +146,7 @@ export const productPaths = {
     },
     patch: {
       tags,
-      summary: 'Update a product (admin)',
+      summary: 'Update a product (needs products.manage)',
       description: 'Existing options can be renamed, but options cannot be added.',
       security,
       parameters: [productId],
@@ -163,7 +163,7 @@ export const productPaths = {
     },
     delete: {
       tags,
-      summary: 'Deactivate a product (admin)',
+      summary: 'Deactivate a product (needs products.manage)',
       description: 'The product is kept, and can be restored by setting `active` to true.',
       security,
       parameters: [productId],
@@ -180,7 +180,7 @@ export const productPaths = {
   '/api/products/{id}/images': {
     post: {
       tags,
-      summary: 'Add an uploaded asset to a product (admin)',
+      summary: 'Add an uploaded asset to a product (needs products.manage)',
       description: 'A product can have up to 10 images.',
       security,
       parameters: [productId],
@@ -199,7 +199,7 @@ export const productPaths = {
   '/api/products/{id}/images/{imageId}': {
     patch: {
       tags,
-      summary: 'Change the alt text or position of an image (admin)',
+      summary: 'Change the alt text or position of an image (needs products.manage)',
       security,
       parameters: [productId, imageId],
       requestBody: jsonBody('UpdateProductImage'),
@@ -214,7 +214,7 @@ export const productPaths = {
     },
     delete: {
       tags,
-      summary: 'Remove an image from a product (admin)',
+      summary: 'Remove an image from a product (needs products.manage)',
       description: 'The uploaded file is kept. Fails with 409 while a variant uses the image.',
       security,
       parameters: [productId, imageId],
@@ -232,7 +232,7 @@ export const productPaths = {
   '/api/products/{id}/variants': {
     post: {
       tags,
-      summary: 'Add a variant (admin)',
+      summary: 'Add a variant (needs products.manage)',
       security,
       parameters: [productId],
       requestBody: jsonBody('CreateVariant'),
@@ -250,7 +250,7 @@ export const productPaths = {
   '/api/products/{id}/variants/{variantId}': {
     patch: {
       tags,
-      summary: 'Update a variant (admin)',
+      summary: 'Update a variant (needs products.manage or, for stock only, inventory.manage)',
       security,
       parameters: [productId, variantId],
       requestBody: jsonBody('UpdateVariant'),
@@ -266,7 +266,7 @@ export const productPaths = {
     },
     delete: {
       tags,
-      summary: 'Deactivate a variant (admin)',
+      summary: 'Deactivate a variant (needs products.manage)',
       security,
       parameters: [productId, variantId],
       responses: {

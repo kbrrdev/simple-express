@@ -57,7 +57,7 @@ export const blogPaths = {
     },
     post: {
       tags,
-      summary: 'Create a blog (admin)',
+      summary: 'Create a blog (needs blogs.manage)',
       security,
       requestBody: {
         required: true,
@@ -86,7 +86,7 @@ export const blogPaths = {
   '/api/blogs/admin': {
     get: {
       tags,
-      summary: 'List all blogs, including drafts (admin)',
+      summary: 'List all blogs, including drafts (needs blogs.manage)',
       security,
       parameters: [
         { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
@@ -123,7 +123,7 @@ export const blogPaths = {
   '/api/blogs/admin/{id}': {
     get: {
       tags,
-      summary: 'Get any blog, including drafts (admin)',
+      summary: 'Get any blog, including drafts (needs blogs.manage)',
       security,
       parameters: [blogId],
       responses: {
@@ -150,7 +150,7 @@ export const blogPaths = {
     },
     patch: {
       tags,
-      summary: 'Update a blog (admin)',
+      summary: 'Update a blog (needs blogs.manage)',
       security,
       parameters: [blogId],
       requestBody: {
@@ -170,7 +170,7 @@ export const blogPaths = {
     },
     delete: {
       tags,
-      summary: 'Delete a blog (admin)',
+      summary: 'Delete a blog (needs blogs.manage)',
       security,
       parameters: [blogId],
       responses: {

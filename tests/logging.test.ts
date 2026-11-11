@@ -7,7 +7,14 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { app } from '../src/app';
 import { env } from '../src/config/env';
 import { db, pool } from '../src/db';
-import { categories, paymentMethods, products, productVariants, users } from '../src/db/schema';
+import {
+  categories,
+  paymentMethods,
+  products,
+  productVariants,
+  SUPER_ADMIN_ROLE_ID,
+  users,
+} from '../src/db/schema';
 import { createLogger, logger } from '../src/lib/logger';
 import {
   logContext,
@@ -106,7 +113,7 @@ beforeAll(async () => {
   await db.execute(sql`truncate table users, sessions, login_attempts cascade`);
 
   adminToken = (await registerAndLogin(adminEmail)).accessToken;
-  await db.update(users).set({ role: 'admin' }).where(eq(users.email, adminEmail));
+  await db.update(users).set({ roleId: SUPER_ADMIN_ROLE_ID }).where(eq(users.email, adminEmail));
 
   const customer = await registerAndLogin(customerEmail);
   token = customer.accessToken;
