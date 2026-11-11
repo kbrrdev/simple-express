@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { count, sql } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { db, pool } from '../src/db';
 import {
@@ -88,6 +88,15 @@ describe('seed', () => {
       { status: 'cancelled', paymentStatus: 'unpaid' },
       { status: 'awaiting_payment', paymentStatus: 'unpaid' },
     ]);
+
+    const lines = await db
+      .select({ total: count() })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .groupBy(orders.orderNumber)
+      .orderBy(orders.orderNumber);
+
+    expect(lines.map((row) => row.total)).toEqual([3, 2, 3, 1, 2, 2]);
   }, 60000);
 
   it('refuses to run twice', () => {

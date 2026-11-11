@@ -232,6 +232,8 @@ async function main() {
   // Delivered by COD, which marks it paid.
   const delivered = await checkout(customer.id, home.id, 'cod', [
     { variantId: variant(tShirt, 0), quantity: 2 },
+    { variantId: variant(tShirt, 1), quantity: 1 },
+    { variantId: variant(tote, 0), quantity: 1 },
   ]);
   await updateOrderStatus(delivered, 'confirmed');
   await updateOrderStatus(delivered, 'shipped');
@@ -240,6 +242,7 @@ async function main() {
   // Paid by GCash and confirmed by an admin.
   const confirmed = await checkout(customer.id, home.id, gcash.id, [
     { variantId: variant(runner, 1), quantity: 1 },
+    { variantId: variant(tShirt, 2), quantity: 1 },
   ]);
   await submitOwnPayment(customer.id, confirmed, 'GC-1000000001');
   await confirmPayment(confirmed);
@@ -248,19 +251,25 @@ async function main() {
   // A reference waiting for an admin to check it.
   const submitted = await checkout(customer.id, home.id, bank.id, [
     { variantId: variant(dress, 0), quantity: 1 },
+    { variantId: variant(flats, 0), quantity: 1 },
+    { variantId: variant(tote, 0), quantity: 2 },
   ]);
   await submitOwnPayment(customer.id, submitted, 'BPI-2000000002');
 
   // Waiting for the customer to pay.
-  await checkout(customer.id, home.id, gcash.id, [{ variantId: variant(flats, 0), quantity: 1 }]);
+  await checkout(customer.id, home.id, gcash.id, [{ variantId: variant(flats, 1), quantity: 1 }]);
 
   // Cancelled by the customer, which returns the stock.
   const cancelled = await checkout(customer.id, home.id, 'cod', [
     { variantId: variant(tote, 0), quantity: 3 },
+    { variantId: variant(runner, 2), quantity: 1 },
   ]);
   await cancelOwnOrder(customer.id, cancelled);
 
-  const guestItems = [{ variantId: variant(tote, 0), quantity: 1 }];
+  const guestItems = [
+    { variantId: variant(tote, 0), quantity: 1 },
+    { variantId: variant(tShirt, 2), quantity: 2 },
+  ];
   const guestPreview = await previewOrder(guestItems);
   await createGuestOrder({
     email: 'guest@example.com',
