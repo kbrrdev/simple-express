@@ -115,6 +115,7 @@ Central route registration. Module routes are mounted under `/api`.
 - Drizzle Kit generates migrations into `drizzle/`.
 - Each module defines its tables in `<name>.schema.ts`, exported through `src/db/schema.ts`.
 - Docker applies pending migrations when the API container starts. Outside Docker, run `npm run db:migrate`.
+- `src/db/seed.ts` fills an empty database through the module services, so sample data follows the same rules as the API. It refuses to run in production.
 - The API connects with `DATABASE_URL`, a limited role that can read and write rows only. Migrations use `MIGRATION_DATABASE_URL`, and create the limited role and its grants.
 
 ## Authentication

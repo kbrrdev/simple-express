@@ -97,6 +97,7 @@ To use another port, update `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
 | `npm run db:migrate`               | Apply pending migrations                            |
 | `npm run db:studio`                | Open Drizzle Studio                                 |
 | `npm run db:make-admin -- <email>` | Make an existing user an admin                      |
+| `npm run db:seed`                  | Fill an empty database with sample data             |
 | `npm run postman`                  | Regenerate the Postman collection                   |
 | `npm run email:test -- <email>`    | Send a test email                                   |
 | `npm run docker:watch`             | Run Docker development environment with live reload |
@@ -201,6 +202,31 @@ npm run email:test -- you@example.com
 ```
 
 To send from code, use `sendEmail` from `src/lib/email.ts`. Send after saving your changes, and handle a failure, so that a mail problem never undoes an order. Real email settings are in [docs/deployment.md](docs/deployment.md).
+
+## Sample Data
+
+To fill an empty development database with sample data, run the migrations, then:
+
+```bash
+npm run db:seed
+```
+
+It adds an admin and a customer, nested categories, products with variants and images, payment methods, blogs, a cart, and orders in each status. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+
+| Email                  | Role     | Password           |
+| ---------------------- | -------- | ------------------ |
+| `admin@example.com`    | Admin    | `dev-password-123` |
+| `customer@example.com` | Customer | `dev-password-123` |
+
+The seed refuses to run in production, or when the database already has users. To seed again, reset the database and run the migrations first:
+
+```bash
+npm run docker:down -- -v
+npm run docker:watch
+npm run db:seed
+```
+
+`-v` also deletes uploaded files. On a staging server, run `docker compose exec api node dist/db/seed.js`.
 
 ## Viewing the Database
 
