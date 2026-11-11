@@ -127,7 +127,7 @@ Only scan systems you own. ZAP submits junk data and, with an admin token, can d
 - Use a customer's token on an admin route.
 - Send a negative quantity, or a very large one.
 - Add fields the API should reject, such as `role` or `priceCents`.
-- Once orders exist, try to change a price at checkout, or pay for less than the total.
+- Try to change a price at checkout, or pay for less than the total.
 
 ## Snyk
 

@@ -7,6 +7,9 @@
 - TypeScript
 - PostgreSQL
 - Drizzle ORM
+- Joi
+- Pino
+- Vitest and Supertest
 - Docker
 - ESLint
 - Prettier
@@ -127,7 +130,6 @@ If a simpler solution works just as well, choose the simpler solution.
 
 - Use environment variables for configuration.
 - Never commit `.env` files or secrets.
-- Keep `.env.example` updated.
 - Use Docker Compose for local development services.
 - Do not hardcode database credentials or application secrets.
 - Keep Docker configuration simple and understandable.
@@ -184,6 +186,8 @@ If a simpler solution works just as well, choose the simpler solution.
 - Run ESLint.
 - Run relevant tests.
 - Apply Prettier formatting.
+- Run `npm run postman` if any `<name>.openapi.ts` changed.
+- Update `README.md` and `docs/architecture.md` when behaviour changes.
 - Fix errors introduced by the changes.
 - Summarize what was implemented and mention any important decisions.
 

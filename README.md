@@ -41,7 +41,7 @@ Set `JWT_SECRET` to a random value of at least 32 characters. The API will not s
 node -p "require('crypto').randomBytes(32).toString('hex')"
 ```
 
-Set `POSTGRES_PASSWORD` and `APP_DB_PASSWORD` to random values too, using only URL-safe characters. Docker will not start without them. The API connects as this limited role, which can read and write rows but not change the schema. When running on your host, also put it in `DATABASE_URL`.
+Set `POSTGRES_PASSWORD` and `APP_DB_PASSWORD` to random values too, using only URL-safe characters. Docker will not start without them. The API connects as this limited role, which can read and write rows but not change the schema. When running on your host, also put it in `DATABASE_URL`, and set `MIGRATION_DATABASE_URL`, which `npm run db:migrate` connects with.
 
 Update the other environment variables as needed. If the API runs behind a proxy, set `TRUST_PROXY_HOPS` to the number of proxies.
 
@@ -280,7 +280,7 @@ Passwords must be 8 to 128 characters and cannot be a common password. After fiv
 
 Forgotten passwords are reset by email. The link opens `PASSWORD_RESET_URL`, a page in your storefront, with the token after `#token=`. The page sends it to `/api/auth/reset-password` with the new password. Links expire in 30 minutes and work once.
 
-To protect a route, add the `requireAuth` middleware. The current user is then available in `res.locals.auth`. Reading blogs is public.
+To protect a route, add the `requireAuth` middleware. The current user is then available in `res.locals.auth`.
 
 Users are either a `customer` or an `admin`, and new users are always customers. To restrict a route to admins, add `requireAdmin` after `requireAuth`.
 
@@ -404,7 +404,7 @@ awaiting_payment → pending → confirmed → shipped → delivered
    cancelled      cancelled  cancelled   returned
 ```
 
-- Customers can cancel while an order is `pending`, and admins can also cancel `confirmed` orders. Cancelling returns stock.
+- Customers can cancel a `pending` order, or an `awaiting_payment` order before they submit a payment reference, and admins can also cancel `confirmed` orders. Cancelling returns stock.
 - `returned` does not return stock, as the item may be damaged. If it is fine, add it back by updating the variant.
 - A COD order becomes `paid` when it is marked `delivered`, as the customer has paid the courier. Whether the courier has sent you the money is not tracked.
 
@@ -519,7 +519,7 @@ A user's first address becomes the default. Deleting the default makes the newes
 
 ## Assets
 
-All uploaded files are stored in one `assets` table, and products and blogs point to it. Only admins can upload, and anyone can view uploaded files.
+All uploaded files are stored in one `assets` table, and products, variants, categories, blogs, and payment methods point to it. Only admins can upload, and anyone can view uploaded files.
 
 Attaching an image takes two steps:
 
@@ -528,18 +528,20 @@ Attaching an image takes two steps:
 2. Attach it using the id, as shown below.
 ```
 
-| Endpoint                                      | Description                                                 |
-| --------------------------------------------- | ----------------------------------------------------------- |
-| `GET /api/assets`                             | List uploaded files                                         |
-| `POST /api/assets`                            | Upload a JPEG, PNG, or WebP image of up to 5 MB             |
-| `DELETE /api/assets/:id`                      | Delete a file that nothing uses                             |
-| `POST /api/products/:id/images`               | Add an asset to a product, up to 10                         |
-| `PATCH /api/products/:id/images/:imageId`     | Change an image's alt text or position                      |
-| `DELETE /api/products/:id/images/:imageId`    | Remove an image from a product, keeping the file            |
-| `PATCH /api/products/:id/variants/:variantId` | Set `assetId` to give a variant one of the product's images |
-| `POST /api/blogs` or `PATCH /api/blogs/:id`   | Set `coverAssetId` to give a blog a cover                   |
+| Endpoint                                                        | Description                                                 |
+| --------------------------------------------------------------- | ----------------------------------------------------------- |
+| `GET /api/assets`                                               | List uploaded files                                         |
+| `POST /api/assets`                                              | Upload a JPEG, PNG, or WebP image of up to 5 MB             |
+| `DELETE /api/assets/:id`                                        | Delete a file that nothing uses                             |
+| `POST /api/products/:id/images`                                 | Add an asset to a product, up to 10                         |
+| `PATCH /api/products/:id/images/:imageId`                       | Change an image's alt text or position                      |
+| `DELETE /api/products/:id/images/:imageId`                      | Remove an image from a product, keeping the file            |
+| `PATCH /api/products/:id/variants/:variantId`                   | Set `assetId` to give a variant one of the product's images |
+| `POST /api/blogs` or `PATCH /api/blogs/:id`                     | Set `coverAssetId` to give a blog a cover                   |
+| `POST /api/categories` or `PATCH /api/categories/:id`           | Set `imageAssetId` to give a category an image              |
+| `POST /api/payment-methods` or `PATCH /api/payment-methods/:id` | Set `qrAssetId` to give a method a QR code                  |
 
-File types are checked from the file's contents, and uploaded filenames are never used. A file cannot be deleted while a product, variant, or blog uses it.
+File types are checked from the file's contents, and uploaded filenames are never used. A file cannot be deleted while anything uses it, including past orders.
 
 ### File Storage
 
