@@ -14,6 +14,7 @@ import { categoryRoutes } from '../modules/categories/category.routes';
 import { orderRoutes } from '../modules/orders/order.routes';
 import { paymentMethodRoutes } from '../modules/payment-methods/payment-method.routes';
 import { productRoutes } from '../modules/products/product.routes';
+import { reportRoutes } from '../modules/reports/report.routes';
 
 const apiRoutes = Router();
 
@@ -27,6 +28,7 @@ apiRoutes.use('/categories', categoryRoutes);
 apiRoutes.use('/orders', orderRoutes);
 apiRoutes.use('/payment-methods', paymentMethodRoutes);
 apiRoutes.use('/products', productRoutes);
+apiRoutes.use('/reports', reportRoutes);
 
 export const routes = Router();
 

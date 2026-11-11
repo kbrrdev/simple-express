@@ -55,6 +55,8 @@ export const orders = pgTable(
     }),
     paymentStatus: paymentStatus('payment_status').notNull().default('unpaid'),
     paymentDueAt: timestamp('payment_due_at', { withTimezone: true }),
+    // Set once by markPaid, so reports can count payments by the day they arrived.
+    paidAt: timestamp('paid_at', { withTimezone: true }),
     subtotalCents: bigint('subtotal_cents', { mode: 'number' }).notNull(),
     shippingCents: integer('shipping_cents').notNull(),
     taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),
@@ -82,6 +84,8 @@ export const orders = pgTable(
     index('orders_user_id_created_at_idx').on(table.userId, table.createdAt),
     index('orders_status_idx').on(table.status),
     index('orders_payment_due_at_idx').on(table.paymentDueAt),
+    index('orders_created_at_idx').on(table.createdAt),
+    index('orders_paid_at_idx').on(table.paidAt),
     check('orders_total_cents_non_negative', sql`${table.totalCents} >= 0`),
   ],
 );

@@ -107,6 +107,7 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/orders`          | Orders module                 |
 | `/api/payment-methods` | Payment methods module        |
 | `/api/products`        | Products module               |
+| `/api/reports`         | Reports module                |
 
 ## Database
 
@@ -182,12 +183,20 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Status changes lock the order row, so that stock is only returned once. `adminTransitions` in `order.service.ts` lists the allowed moves.
 - Unpaid orders hold stock for free. `MAX_OPEN_UNPAID_ORDERS` limits them per customer or guest email, and guest orders are limited to 10 items. Guest checkout takes an advisory lock on the email, so that parallel requests cannot pass the limit or create duplicates.
 - Order amounts are `bigint`, as a total can pass the 32-bit limit.
-- `markPaid` is the only way an order becomes paid, and is safe to repeat, so a future webhook can use it. `calculateShipping` is the only place that sets the fee.
+- `markPaid` is the only way an order becomes paid, and is safe to repeat, so a future webhook can use it. It sets `paid_at`, which reports use to count payments by the day they arrived. `calculateShipping` is the only place that sets the fee.
 - Manual orders start as `awaiting_payment`, and a row in `payments` records the reference. The unique provider and reference stop a payment being counted twice.
 - Orders copy the provider, account name, account number, and QR of the `payment_methods` row they were placed with. The QR has a foreign key, so a file an unpaid order still shows cannot be deleted.
 - `expireUnpaidOrders` runs every 5 minutes from `index.ts`. It uses `FOR UPDATE SKIP LOCKED`, so several servers can run it safely, and it skips orders with a submitted reference.
 - Guest orders have a `guest_email` and no `user_id`, and are never linked to accounts. Their links do not expire, so finished orders hide the shipping address. Their `guestToken` is the order ID with an HMAC signature, so a retry can return the same link without storing it. Changing `JWT_SECRET` invalidates these links.
 - Tax is calculated per line and on shipping. `TAX_RATE_PERCENT` and `PRICES_INCLUDE_TAX` set it, and both are saved on each order.
+
+## Reports
+
+- `/api/reports` is for admins only, and reads the amounts saved on each order. A change to the tax rate or a product's price never changes past figures, and the summary splits tax by the rate each order was placed with.
+- Days, weeks, and months follow Manila time, as the store only ships within the Philippines. Ranges include both dates and default to the last 30 days.
+- Gross sales are orders placed in the range, apart from cancelled ones. Collected counts payments by `paid_at`, and refunds against the period the payment arrived in, as no refund date is stored.
+- Orders paid before `paid_at` existed took their `updated_at` as a best guess.
+- Reports are aggregated on each request, as a store this size needs no caching. `orders.created_at` and `orders.paid_at` are indexed for date ranges, and a daily chart covers up to 366 days.
 
 ## Addresses
 

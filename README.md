@@ -145,7 +145,8 @@ src/
     ├── categories/
     ├── orders/
     ├── payment-methods/
-    └── products/
+    ├── products/
+    └── reports/
 
 docs/
 drizzle/
@@ -483,6 +484,26 @@ Set these in `.env`:
 Tax applies to items and shipping. Orders show `vatableCents`, `taxCents`, and `totalCents`, and keep the rate and fee they were placed with. This is an order summary, not an official invoice.
 
 To use a courier's rates, change `calculateShipping` in `order.service.ts`, which preview and checkout both use.
+
+## Reports
+
+Admins get dashboard data from these endpoints. Each one feeds one part of a dashboard.
+
+| Endpoint                        | Dashboard part   | Returns                                                                     |
+| ------------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| `GET /api/reports/summary`      | Headline numbers | Orders, gross sales, collected, refunds, tax, shipping, average order value |
+| `GET /api/reports/sales`        | Sales chart      | Orders, gross sales, and collected per `day`, `week`, or `month`            |
+| `GET /api/reports/top-products` | Best sellers     | Products by `quantity` or `revenue`                                         |
+| `GET /api/reports/order-status` | Needs attention  | Orders per status, and payments to confirm, orders to confirm, and to ship  |
+| `GET /api/reports/low-stock`    | Low stock        | Variants on sale with stock at or below `threshold`, 5 by default           |
+
+Ranges take `from` and `to` as dates, such as `?from=2026-03-01&to=2026-03-31`. Both days are included, days follow Manila time, and the default is the last 30 days. `order-status` and `low-stock` show the store as it is now.
+
+- **Gross sales** are orders placed in the range, apart from cancelled ones.
+- **Collected** is payments received in the range, counted on the day they arrived. COD orders are collected on delivery.
+- **Refunded** is payments received in the range that were later refunded.
+
+Reports use the amounts saved on each order, so changing the tax rate never changes past figures. If the rate changes during a range, `taxByRate` in the summary lists each rate separately.
 
 ## Addresses
 
