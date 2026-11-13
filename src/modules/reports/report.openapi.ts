@@ -176,6 +176,7 @@ export const reportSchemas = {
       'discountCents',
       'saleDiscountCents',
       'couponDiscountCents',
+      'promotionDiscountCents',
       'newCustomers',
       'taxByRate',
     ],
@@ -192,7 +193,10 @@ export const reportSchemas = {
       netCollectedCents: cents('Collected minus refunded'),
       taxCents: cents('Tax on gross sales'),
       shippingCents: cents('Shipping on gross sales'),
-      discountCents: cents('saleDiscountCents and couponDiscountCents together'),
+      discountCents: cents('Sale, promotion, and coupon discounts together'),
+      promotionDiscountCents: cents(
+        'Taken off by buy X get Y and bundle promotions, on gross sales',
+      ),
       saleDiscountCents: cents('Taken off list prices by sales, on gross sales'),
       couponDiscountCents: cents(
         'Taken off by coupons, on gross sales. Waived shipping is not included.',

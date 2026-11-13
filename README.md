@@ -150,6 +150,7 @@ src/
     ├── orders/
     ├── payment-methods/
     ├── products/
+    ├── promotions/
     ├── reports/
     ├── roles/
     ├── sales/
@@ -218,7 +219,7 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, two coupons and an automatic discount, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, two coupons and an automatic discount, a buy X get Y and a bundle, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
 | Email                  | Role        | Password           |
 | ---------------------- | ----------- | ------------------ |
@@ -331,7 +332,7 @@ New users are customers, with no role. Staff accounts get a role, and each role 
 | `categories.manage`      | Create, edit, and delete categories                                       |
 | `blogs.manage`           | Write blogs and read drafts                                               |
 | `banners.manage`         | Manage the storefront banners                                             |
-| `promotions.manage`      | Manage sales, flash sales, and coupons                                    |
+| `promotions.manage`      | Manage sales, flash sales, coupons, and promotions                        |
 | `assets.manage`          | List, upload, and delete files                                            |
 | `payment_methods.manage` | Manage payment methods and see account numbers                            |
 | `reports.operations`     | Order status and low stock reports                                        |
@@ -423,6 +424,16 @@ A sale takes a percentage or a fixed amount off chosen products, or off whole ca
 - `stockCap` limits how many units sell at the sale price, across all its products. Once they are sold, prices go back to normal, and cancelled orders give their units back. A cart only gets the sale price when all its units of that sale fit under the cap.
 
 Shoppers see sales through the prices they already use. Public product routes, the cart, and order previews return the sale price as `priceCents` or `unitPriceCents`, with `compareAtPriceCents` for showing the old price struck through, and `saleEndsAt` for a countdown. Admin product routes return the list price, which is what admins edit. Order items keep `listPriceCents`, the price before any sale.
+
+## Promotions
+
+Promotions are discounts on items bought together. Users with `promotions.manage` manage them at `/api/promotions`, with the same list, get, add, update, and delete endpoints as sales.
+
+- **Buy X get Y** covers products or categories. In every `buyQuantity` + `getQuantity` units, `getPercentOff` comes off, and the cheapest units in the cart are the ones discounted. 100 makes them free.
+- **Bundles** list 2 to 10 products. Each complete set gets `discountType` `percent` or `fixed` off, priced with the cheapest unit of each product in the cart.
+- Items on sale are left out. Each cart line gets at most one promotion, the largest discount first.
+- Coupons treat promoted lines like sale items, so they are left out unless the coupon has `allowSaleItems`.
+- Public product routes add `promotions` for badges. The order preview adds `promotions`, with what each took off, and `promotionDiscountCents`. Order items keep `promotionName` and `promotionDiscountCents`, so deleting a promotion never changes past orders.
 
 ## Coupons
 
@@ -658,7 +669,7 @@ Ranges take `from` and `to` as dates, such as `?from=2026-03-01&to=2026-03-31`. 
 - **Gross sales** are orders placed in the range, apart from cancelled ones.
 - **Collected** is payments received in the range, counted on the day they arrived. COD orders are collected on delivery.
 - **Refunded** is payments received in the range that were later refunded.
-- **Discounts** is what sales took off list prices, as `saleDiscountCents`, and what coupons took off, as `couponDiscountCents`, on gross sales. Waived shipping is not included.
+- **Discounts** is what sales took off list prices, as `saleDiscountCents`, what promotions took off, as `promotionDiscountCents`, and what coupons took off, as `couponDiscountCents`, on gross sales. Waived shipping is not included.
 
 Reports use the amounts saved on each order, so changing the tax rate never changes past figures. If the rate changes during a range, `taxByRate` in the summary lists each rate separately.
 

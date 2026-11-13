@@ -62,6 +62,9 @@ export const orders = pgTable(
     // The coupon used, copied so the order keeps it if the coupon changes.
     couponCode: varchar('coupon_code', { length: 32 }),
     discountCents: bigint('discount_cents', { mode: 'number' }).notNull().default(0),
+    promotionDiscountCents: bigint('promotion_discount_cents', { mode: 'number' })
+      .notNull()
+      .default(0),
     shippingCents: integer('shipping_cents').notNull(),
     taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),
     totalCents: bigint('total_cents', { mode: 'number' }).notNull(),
@@ -116,7 +119,12 @@ export const orderItems = pgTable(
     listPriceCents: integer('list_price_cents').notNull(),
     // Lets a cancelled order give its units back to a capped sale.
     saleId: uuid('sale_id').references(() => sales.id, { onDelete: 'set null' }),
-    // The coupon's share of this line. lineTotalCents is after it.
+    // The promotion's and the coupon's shares of this line. lineTotalCents is after both.
+    promotionDiscountCents: bigint('promotion_discount_cents', { mode: 'number' })
+      .notNull()
+      .default(0),
+    // Copied, so the order keeps it if the promotion is deleted.
+    promotionName: varchar('promotion_name', { length: 100 }),
     discountCents: bigint('discount_cents', { mode: 'number' }).notNull().default(0),
     quantity: integer().notNull(),
     taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),

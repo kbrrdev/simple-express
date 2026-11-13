@@ -365,6 +365,19 @@ export const productSchemas = {
       updatedAt: { type: 'string', format: 'date-time' },
       images: { type: 'array', items: { $ref: '#/components/schemas/ProductImage' } },
       variants: { type: 'array', items: { $ref: '#/components/schemas/ProductVariant' } },
+      promotions: {
+        type: 'array',
+        description: 'Public routes only. Promotions running on this product, for badges.',
+        items: {
+          type: 'object',
+          required: ['id', 'name', 'type'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', example: 'Buy 2 tees, get 1 free' },
+            type: { type: 'string', enum: ['buy_x_get_y', 'bundle'] },
+          },
+        },
+      },
     },
   },
   ProductVariant: {

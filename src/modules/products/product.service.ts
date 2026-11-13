@@ -8,6 +8,7 @@ import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
 import { changesBetween, recordAudit, type AuditEntry } from '../audit-logs/audit-log.service';
 import { findCategoryAndDescendantIds } from '../categories/category.service';
+import { findProductPromotions } from '../promotions/promotion.service';
 import { findSalePrices } from '../sales/sale.service';
 import {
   productImages,
@@ -98,24 +99,31 @@ export async function listProducts(
   };
 }
 
-/** Shoppers see sale prices. Admins see and edit the list price. */
-async function withSalePrices<T extends { categoryId: string; variants: ProductVariant[] }>(
-  items: T[],
-) {
-  const prices = await findSalePrices(
-    db,
-    items.flatMap((item) =>
-      item.variants.map((variant) => ({
-        variantId: variant.id,
-        productId: variant.productId,
-        categoryId: item.categoryId,
-        priceCents: variant.priceCents,
-      })),
+/** Shoppers see sale prices and promotion badges. Admins see and edit the list price. */
+async function withSalePrices<
+  T extends { id: string; categoryId: string; variants: ProductVariant[] },
+>(items: T[]) {
+  const [prices, promotions] = await Promise.all([
+    findSalePrices(
+      db,
+      items.flatMap((item) =>
+        item.variants.map((variant) => ({
+          variantId: variant.id,
+          productId: variant.productId,
+          categoryId: item.categoryId,
+          priceCents: variant.priceCents,
+        })),
+      ),
     ),
-  );
+    findProductPromotions(
+      db,
+      items.map((item) => item.id),
+    ),
+  ]);
 
   return items.map((item) => ({
     ...item,
+    promotions: promotions.get(item.id) ?? [],
     variants: item.variants.map((variant) => {
       const sale = prices.get(variant.id);
       return {

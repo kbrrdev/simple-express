@@ -11,6 +11,7 @@ export const auditEntityTypes = [
   'payment_method',
   'product',
   'product_image',
+  'promotion',
   'role',
   'sale',
   'user',

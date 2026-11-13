@@ -40,13 +40,19 @@ import { previewCart } from '../cart/cart.service';
 import type { CartItemInput } from '../cart/cart.validation';
 import { paymentMethods } from '../payment-methods/payment-method.schema';
 import { productImages, products, productVariants } from '../products/product.schema';
+import { applyPromotions } from '../promotions/promotion.service';
 import { claimSaleStock, findSalePrices, releaseSaleStock } from '../sales/sale.service';
 import { orderItems, orders, payments, type Order, type OrderStatus } from './order.schema';
 import type { CreateOrderBody, GuestOrderBody, ListOrdersQuery } from './order.validation';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Database = typeof db | Transaction;
-type PricedItem = { unitPriceCents: number; quantity: number; discountCents?: number };
+type PricedItem = {
+  unitPriceCents: number;
+  quantity: number;
+  promotionDiscountCents?: number;
+  discountCents?: number;
+};
 
 interface PlaceOrderInput {
   owner: { userId: string } | { guestEmail: string };
@@ -110,7 +116,11 @@ export async function calculateShipping(
   _address?: { province: string },
 ): Promise<number> {
   const subtotalCents = items.reduce(
-    (total, item) => total + item.unitPriceCents * item.quantity - (item.discountCents ?? 0),
+    (total, item) =>
+      total +
+      item.unitPriceCents * item.quantity -
+      (item.promotionDiscountCents ?? 0) -
+      (item.discountCents ?? 0),
     0,
   );
 
@@ -127,26 +137,39 @@ function priceOrder<T extends PricedItem>(items: T[], shippingCents: number) {
   const taxOf = (amount: number) =>
     Math.round((amount * rate) / (pricesIncludeTax ? 10000 + rate : 10000));
 
-  // A coupon's share comes off each line before tax, so tax follows what is actually paid.
+  // Discounts come off each line before tax, so tax follows what is actually paid.
   const lines = items.map((item) => {
+    const promotionDiscountCents = item.promotionDiscountCents ?? 0;
     const discountCents = item.discountCents ?? 0;
-    const lineTotalCents = item.unitPriceCents * item.quantity - discountCents;
-    return { ...item, discountCents, lineTotalCents, taxCents: taxOf(lineTotalCents) };
+    const lineTotalCents =
+      item.unitPriceCents * item.quantity - promotionDiscountCents - discountCents;
+    return {
+      ...item,
+      promotionDiscountCents,
+      discountCents,
+      lineTotalCents,
+      taxCents: taxOf(lineTotalCents),
+    };
   });
 
   const subtotalCents = lines.reduce(
     (total, line) => total + line.unitPriceCents * line.quantity,
     0,
   );
+  const promotionDiscountCents = lines.reduce(
+    (total, line) => total + line.promotionDiscountCents,
+    0,
+  );
   const discountCents = lines.reduce((total, line) => total + line.discountCents, 0);
   const taxCents = lines.reduce((total, line) => total + line.taxCents, taxOf(shippingCents));
-  const beforeTax = subtotalCents - discountCents + shippingCents;
+  const beforeTax = subtotalCents - promotionDiscountCents - discountCents + shippingCents;
 
   return {
     lines,
     rate,
     pricesIncludeTax,
     subtotalCents,
+    promotionDiscountCents,
     discountCents,
     shippingCents,
     taxCents,
@@ -156,6 +179,7 @@ function priceOrder<T extends PricedItem>(items: T[], shippingCents: number) {
 
 function toOrderTotals({
   subtotalCents,
+  promotionDiscountCents,
   discountCents,
   shippingCents,
   taxCents,
@@ -163,6 +187,7 @@ function toOrderTotals({
 }: Order) {
   return {
     subtotalCents,
+    promotionDiscountCents,
     discountCents,
     shippingCents,
     vatableCents: totalCents - taxCents,
@@ -263,14 +288,16 @@ export async function previewOrder(
   const available = cart.items
     .filter((item) => item.available)
     .map((item) => ({ ...item, onSale: item.compareAtPriceCents !== null }));
-  const { applied, couponError, pricing } =
+  const { applied, couponError, promotions, pricing } =
     available.length > 0
       ? await priceWithBestDiscount(db, available, { couponCode, customer })
-      : { applied: undefined, couponError: null, pricing: priceOrder([], 0) };
+      : { applied: undefined, couponError: null, promotions: [], pricing: priceOrder([], 0) };
 
   return {
     items: cart.items,
     subtotalCents: pricing.subtotalCents,
+    promotions,
+    promotionDiscountCents: pricing.promotionDiscountCents,
     discountCents: pricing.discountCents,
     coupon: applied
       ? {
@@ -292,6 +319,7 @@ export async function previewOrder(
 
 interface DiscountItem extends PricedItem {
   variantId: string;
+  productId: string;
   onSale: boolean;
 }
 
@@ -311,9 +339,21 @@ async function priceWithBestDiscount<T extends DiscountItem>(
   },
 ) {
   const { couponCode, customer, address, lock = false } = options;
-  const lines = items.map((item) => ({
+
+  // Promotions come first. Their lines count as on sale for coupons, like sale items.
+  const promotions = await applyPromotions(database, items);
+  const promoted = items.map((item) => {
+    const promotion = promotions.lineDiscounts.get(item.variantId);
+    return {
+      ...item,
+      promotionDiscountCents: promotion?.discountCents ?? 0,
+      promotionName: promotion?.promotionName ?? null,
+      onSale: item.onSale || promotion !== undefined,
+    };
+  });
+  const lines = promoted.map((item) => ({
     variantId: item.variantId,
-    lineTotalCents: item.unitPriceCents * item.quantity,
+    lineTotalCents: item.unitPriceCents * item.quantity - item.promotionDiscountCents,
     onSale: item.onSale,
   }));
 
@@ -327,10 +367,10 @@ async function priceWithBestDiscount<T extends DiscountItem>(
     ...(typedCoupon ? [typedCoupon] : []),
   ];
 
-  let best = await priceWith(items, candidates[0], address);
+  let best = await priceWith(promoted, candidates[0], address);
   let applied: AppliedCoupon | undefined;
   for (const option of candidates.slice(1)) {
-    const priced = await priceWith(items, option, address);
+    const priced = await priceWith(promoted, option, address);
     if (priced.pricing.totalCents < best.pricing.totalCents) {
       best = priced;
       applied = option;
@@ -356,7 +396,7 @@ async function priceWithBestDiscount<T extends DiscountItem>(
       : 'This coupon does not lower your total';
   }
 
-  return { applied, couponError, ...best };
+  return { applied, couponError, promotions: promotions.applied, ...best };
 }
 
 async function priceWith<T extends DiscountItem>(
@@ -536,6 +576,7 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
         ? new Date(Date.now() + env.PAYMENT_WINDOW_HOURS * 60 * 60 * 1000)
         : null,
       subtotalCents: pricing.subtotalCents,
+      promotionDiscountCents: pricing.promotionDiscountCents,
       couponCode: result?.coupon.code,
       discountCents: pricing.discountCents,
       shippingCents,
@@ -570,6 +611,8 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       unitPriceCents: line.unitPriceCents,
       listPriceCents: line.listPriceCents,
       saleId: line.saleId,
+      promotionDiscountCents: line.promotionDiscountCents,
+      promotionName: line.promotionName,
       discountCents: line.discountCents,
       quantity: line.quantity,
       taxCents: line.taxCents,
