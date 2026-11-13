@@ -66,7 +66,7 @@ function inRange(column: AnyColumn, { from, to }: DateRange) {
 }
 
 /** Sums a column, only over rows that match `where` when given. Postgres returns sums as text. */
-function sumOf(column: AnyColumn, where?: SQL) {
+function sumOf(column: AnyColumn | SQL, where?: SQL) {
   const filter = where ? sql` filter (where ${where})` : sql``;
   return sql<number>`coalesce(sum(${column})${filter}, 0)`.mapWith(Number);
 }
@@ -91,7 +91,12 @@ export async function getSummary(query: DateRangeQuery) {
       .from(orders)
       .where(inRange(orders.createdAt, range)),
     db
-      .select({ itemsSold: sumOf(orderItems.quantity) })
+      .select({
+        itemsSold: sumOf(orderItems.quantity),
+        discountCents: sumOf(
+          sql`(${orderItems.listPriceCents} - ${orderItems.unitPriceCents}) * ${orderItems.quantity}`,
+        ),
+      })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .where(placedInRange(range)),
@@ -141,6 +146,7 @@ export async function getSummary(query: DateRangeQuery) {
     netCollectedCents: collectedCents - refundedCents,
     taxCents: totals?.taxCents ?? 0,
     shippingCents: totals?.shippingCents ?? 0,
+    discountCents: items[0]?.discountCents ?? 0,
     newCustomers: customers[0]?.newCustomers ?? 0,
     taxByRate: taxByRate.map((row) => ({
       ratePercent: row.taxRateBasisPoints / 100,

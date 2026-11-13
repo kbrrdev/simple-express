@@ -1667,6 +1667,161 @@
       ]
     },
     {
+      "name": "Sales",
+      "item": [
+        {
+          "name": "List every sale (needs promotions.manage)",
+          "request": {
+            "method": "GET",
+            "description": "Shoppers see sales through the prices on products, the cart, and orders, so these routes are for admins only.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sales"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Add a sale (needs promotions.manage)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.collectionVariables.set('saleId', data.id);",
+                  "  if (data.variants) pm.collectionVariables.set('variantId', data.variants[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "A flash sale is a sale with short dates, and optionally a stockCap. When a product is in more than one sale, shoppers get the lowest price.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sales"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Payday Sale\",\n  \"discountType\": \"percent\",\n  \"discountValue\": 20,\n  \"stockCap\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get a sale (needs promotions.manage)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sales",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{saleId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update a sale (needs promotions.manage)",
+          "request": {
+            "method": "PATCH",
+            "description": "productIds and categoryIds replace the whole list when sent. Orders already placed keep their prices.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sales",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{saleId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Payday Sale\",\n  \"discountValue\": 20,\n  \"stockCap\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a sale (needs promotions.manage)",
+          "request": {
+            "method": "DELETE",
+            "description": "Orders already placed keep their prices.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sales",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{saleId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Payment Methods",
       "item": [
         {

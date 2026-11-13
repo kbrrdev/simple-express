@@ -392,7 +392,7 @@ describe('steps before an error', () => {
 
     expect(response.status).toBe(409);
     expect(forRequest(response).find(({ level }) => level === 'warn')?.fields.lastStep).toBe(
-      'Total checked',
+      'Sale stock claimed',
     );
   });
 

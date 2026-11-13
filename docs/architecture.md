@@ -111,6 +111,7 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/products`        | Products module               |
 | `/api/reports`         | Reports module                |
 | `/api/roles`           | Roles module                  |
+| `/api/sales`           | Sales module                  |
 | `/api/users`           | Users module                  |
 
 ## Database
@@ -165,6 +166,15 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Links must be a path starting with `/` or an `https://` link, so a banner cannot run a `javascript:` URL.
 - A store has at most 15 banners, counting inactive ones. Creates take an advisory lock, so parallel requests cannot pass the limit. The admin list returns the limit as `meta.maxBanners`.
 - Banners are deleted outright, as nothing else references them. `banners.manage` guards every change.
+
+## Sales
+
+- A sale takes a percentage or a fixed amount off its products, and off every product in its categories and their subcategories. A flash sale is a sale with short dates and an optional `stock_cap`.
+- `findSalePrices` in `sale.service.ts` is the only place that works out sale prices. Public product routes, the cart, and checkout all use it, so a price never differs between screens. The lowest price wins when sales overlap.
+- Admin product routes return the list price, which is what admins edit.
+- Checkout prices items inside its transaction, and `expectedTotalCents` refuses the order if a sale started or ended after the preview.
+- `sold_count` only counts capped sales, so that checkouts do not queue on a busy sale's row. Checkout claims units with a conditional update, in sale order, so parallel orders cannot pass the cap. Cancelling gives them back through `order_items.sale_id`.
+- Order items keep `list_price_cents`, and the summary report shows the difference as discounts.
 
 ## Categories
 

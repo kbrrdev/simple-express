@@ -58,6 +58,7 @@ const idVariablesByTag: Record<string, string> = {
   Orders: 'orderId',
   'Payment Methods': 'paymentMethodId',
   Products: 'productId',
+  Sales: 'saleId',
 };
 
 const createdIdVariables: Record<string, string> = {
@@ -71,6 +72,7 @@ const createdIdVariables: Record<string, string> = {
   '/api/products': 'productId',
   '/api/products/{id}/images': 'imageId',
   '/api/products/{id}/variants': 'variantId',
+  '/api/sales': 'saleId',
 };
 
 function refName(ref: string) {

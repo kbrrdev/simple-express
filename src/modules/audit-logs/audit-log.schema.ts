@@ -11,6 +11,7 @@ export const auditEntityTypes = [
   'product',
   'product_image',
   'role',
+  'sale',
   'user',
   'variant',
 ] as const;

@@ -147,6 +147,8 @@ describe('adding items', () => {
           option2Name: null,
           option2Value: null,
           unitPriceCents: 1999,
+          compareAtPriceCents: null,
+          saleEndsAt: null,
           quantity: 2,
           lineTotalCents: 3998,
           stock: 12,

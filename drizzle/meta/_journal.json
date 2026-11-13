@@ -155,6 +155,13 @@
       "when": 1794554455243,
       "tag": "0021_banners",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794576320707,
+      "tag": "0022_sales",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,7 @@ import { assets } from '../assets/asset.schema';
 import { users } from '../auth/auth.schema';
 import { paymentMethods } from '../payment-methods/payment-method.schema';
 import { productVariants } from '../products/product.schema';
+import { sales } from '../sales/sale.schema';
 
 // These belong to the store. A future payment provider's statuses are mapped onto them.
 export const orderStatus = pgEnum('order_status', [
@@ -108,6 +109,10 @@ export const orderItems = pgTable(
     option2Name: varchar('option2_name', { length: 50 }),
     option2Value: varchar('option2_value', { length: 100 }),
     unitPriceCents: integer('unit_price_cents').notNull(),
+    // The price before any sale, so that reports can show what discounts cost.
+    listPriceCents: integer('list_price_cents').notNull(),
+    // Lets a cancelled order give its units back to a capped sale.
+    saleId: uuid('sale_id').references(() => sales.id, { onDelete: 'set null' }),
     quantity: integer().notNull(),
     taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),
     lineTotalCents: bigint('line_total_cents', { mode: 'number' }).notNull(),

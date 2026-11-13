@@ -264,6 +264,7 @@ describe('checkout', () => {
       option1Name: 'Size',
       option1Value: 'M',
       unitPriceCents: 112000,
+      listPriceCents: 112000,
       quantity: 1,
       taxCents: 12000,
       lineTotalCents: 112000,

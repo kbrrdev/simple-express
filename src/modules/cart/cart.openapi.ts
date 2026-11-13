@@ -161,6 +161,8 @@ export const cartSchemas = {
       'option2Name',
       'option2Value',
       'unitPriceCents',
+      'compareAtPriceCents',
+      'saleEndsAt',
       'quantity',
       'lineTotalCents',
       'stock',
@@ -179,7 +181,18 @@ export const cartSchemas = {
       option1Value: { ...nullableString, example: 'M' },
       option2Name: { ...nullableString, example: 'Color' },
       option2Value: { ...nullableString, example: 'Red' },
-      unitPriceCents: { type: 'integer', example: 1999 },
+      unitPriceCents: { type: 'integer', description: 'Includes any sale', example: 1999 },
+      compareAtPriceCents: {
+        type: ['integer', 'null'],
+        description:
+          'The price before a sale, for showing it struck through. Null when nothing is on sale.',
+        example: 2499,
+      },
+      saleEndsAt: {
+        type: ['string', 'null'],
+        format: 'date-time',
+        description: 'When the sale price ends, for a countdown. Null when it has no end.',
+      },
       quantity,
       lineTotalCents: { type: 'integer', example: 3998 },
       stock: {

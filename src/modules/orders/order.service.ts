@@ -29,6 +29,7 @@ import { previewCart } from '../cart/cart.service';
 import type { CartItemInput } from '../cart/cart.validation';
 import { paymentMethods } from '../payment-methods/payment-method.schema';
 import { productImages, products, productVariants } from '../products/product.schema';
+import { claimSaleStock, findSalePrices, releaseSaleStock } from '../sales/sale.service';
 import { orderItems, orders, payments, type Order, type OrderStatus } from './order.schema';
 import type { CreateOrderBody, GuestOrderBody, ListOrdersQuery } from './order.validation';
 
@@ -190,12 +191,22 @@ function toPublicOrder(order: Order, { items, qrPaths }: OrderDetails) {
     shippingAddress: { recipientName, phone, line1, line2, barangay, city, province, postalCode },
     items: items
       .filter((item) => item.orderId === order.id)
-      .map(({ id, variantId, path, orderId: _orderId, assetId: _assetId, ...item }) => ({
-        id,
-        variantId,
-        ...item,
-        imageUrl: path ? fileUrl(path) : null,
-      })),
+      .map(
+        ({
+          id,
+          variantId,
+          path,
+          orderId: _orderId,
+          assetId: _assetId,
+          saleId: _saleId,
+          ...item
+        }) => ({
+          id,
+          variantId,
+          ...item,
+          imageUrl: path ? fileUrl(path) : null,
+        }),
+      ),
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
   };
@@ -326,13 +337,30 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   }
   recordStep('Items checked');
 
-  const shippingCents = await calculateShipping(items, address);
-  const pricing = priceOrder(items, shippingCents);
+  const salePrices = await findSalePrices(
+    tx,
+    items.map((item) => ({ ...item, priceCents: item.unitPriceCents })),
+  );
+  const pricedItems = items.map((item) => {
+    const sale = salePrices.get(item.variantId);
+    return {
+      ...item,
+      listPriceCents: item.unitPriceCents,
+      unitPriceCents: sale?.priceCents ?? item.unitPriceCents,
+      saleId: sale?.saleId ?? null,
+    };
+  });
+
+  const shippingCents = await calculateShipping(pricedItems, address);
+  const pricing = priceOrder(pricedItems, shippingCents);
 
   if (pricing.totalCents !== expectedTotalCents) {
     throw new AppError(409, 'The order total has changed');
   }
   recordStep('Total checked');
+
+  await claimSaleStock(tx, pricedItems);
+  recordStep('Sale stock claimed');
 
   await reduceStock(tx, items);
   recordStep('Stock reduced');
@@ -383,6 +411,8 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       option2Name: line.option2Name,
       option2Value: line.option2Value,
       unitPriceCents: line.unitPriceCents,
+      listPriceCents: line.listPriceCents,
+      saleId: line.saleId,
       quantity: line.quantity,
       taxCents: line.taxCents,
       lineTotalCents: line.lineTotalCents,
@@ -729,6 +759,8 @@ async function cancelOrder(tx: Transaction, order: Order) {
       .where(eq(productVariants.id, variantId));
   }
 
+  await releaseSaleStock(tx, order.id);
+
   const [cancelled] = await tx
     .update(orders)
     .set({
@@ -748,6 +780,7 @@ async function cancelOrder(tx: Transaction, order: Order) {
 const checkoutItemFields = {
   variantId: productVariants.id,
   productId: products.id,
+  categoryId: products.categoryId,
   productName: products.name,
   option1Name: products.option1Name,
   option1Value: productVariants.option1Value,

@@ -83,6 +83,7 @@ async function insertOrder(order: SeedOrder) {
     variantId: order.variantId,
     productName: 'Item',
     unitPriceCents: (order.totalCents - 1000) / order.quantity,
+    listPriceCents: (order.totalCents - 1000) / order.quantity,
     quantity: order.quantity,
     taxCents: 0,
     lineTotalCents: order.totalCents - 1000,
@@ -224,6 +225,7 @@ describe('summary', () => {
       netCollectedCents: 28000,
       taxCents: 5941,
       shippingCents: 3000,
+      discountCents: 0,
       newCustomers: 0,
       taxByRate: [
         { ratePercent: 10, pricesIncludeTax: true, taxableCents: 27273, taxCents: 2727 },

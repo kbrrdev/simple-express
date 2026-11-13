@@ -8,6 +8,7 @@ import { fileUrl } from '../../lib/storage';
 import { assets } from '../assets/asset.schema';
 import { changesBetween, recordAudit, type AuditEntry } from '../audit-logs/audit-log.service';
 import { findCategoryAndDescendantIds } from '../categories/category.service';
+import { findSalePrices } from '../sales/sale.service';
 import {
   productImages,
   products,
@@ -84,14 +85,46 @@ export async function listProducts(
     findImages(productIds),
   ]);
 
+  const results = items.map((item) => ({
+    ...item,
+    images: images.filter((image) => image.productId === item.id),
+    variants: variants.filter((variant) => variant.productId === item.id),
+  }));
+
   return {
-    items: items.map((item) => ({
-      ...item,
-      images: images.filter((image) => image.productId === item.id),
-      variants: variants.filter((variant) => variant.productId === item.id),
-    })),
+    items: includeInactive ? results : await withSalePrices(results),
     total: totals[0]?.total ?? 0,
   };
+}
+
+/** Shoppers see sale prices. Admins see and edit the list price. */
+async function withSalePrices<T extends { categoryId: string; variants: ProductVariant[] }>(
+  items: T[],
+) {
+  const prices = await findSalePrices(
+    db,
+    items.flatMap((item) =>
+      item.variants.map((variant) => ({
+        variantId: variant.id,
+        productId: variant.productId,
+        categoryId: item.categoryId,
+        priceCents: variant.priceCents,
+      })),
+    ),
+  );
+
+  return items.map((item) => ({
+    ...item,
+    variants: item.variants.map((variant) => {
+      const sale = prices.get(variant.id);
+      return {
+        ...variant,
+        priceCents: sale?.priceCents ?? variant.priceCents,
+        compareAtPriceCents: sale?.compareAtPriceCents ?? null,
+        saleEndsAt: sale?.saleEndsAt ?? null,
+      };
+    }),
+  }));
 }
 
 export async function getProduct(id: string, includeInactive = false) {
@@ -107,7 +140,11 @@ export async function getProduct(id: string, includeInactive = false) {
     findImages([id]),
   ]);
 
-  return { ...product, images, variants };
+  const result = { ...product, images, variants };
+  if (includeInactive) return result;
+
+  const [priced] = await withSalePrices([result]);
+  return priced ?? notFound(id);
 }
 
 export async function createProduct({ variants, ...data }: CreateProductBody) {

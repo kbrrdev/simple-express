@@ -382,7 +382,22 @@ export const productSchemas = {
         format: 'uuid',
         description: 'The product image for this variant',
       },
-      priceCents,
+      priceCents: {
+        ...priceCents,
+        description:
+          'Price in cents. Public routes return the sale price, and admin routes the list price.',
+      },
+      compareAtPriceCents: {
+        type: ['integer', 'null'],
+        description:
+          'The price before a sale, for showing it struck through. Null when nothing is on sale.',
+        example: 2499,
+      },
+      saleEndsAt: {
+        type: ['string', 'null'],
+        format: 'date-time',
+        description: 'Public routes only. When the sale price ends, for a countdown, or null.',
+      },
       stock,
       active: { type: 'boolean' },
       createdAt: { type: 'string', format: 'date-time' },
