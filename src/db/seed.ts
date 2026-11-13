@@ -23,6 +23,7 @@ import {
   updateOrderStatus,
 } from '../modules/orders/order.service';
 import { createMethod } from '../modules/payment-methods/payment-method.service';
+import { createPromotion } from '../modules/promotions/promotion.service';
 import { createSale } from '../modules/sales/sale.service';
 import {
   addImage,
@@ -229,6 +230,23 @@ async function main() {
     endsAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
     stockCap: 20,
     productIds: [runner.id],
+  });
+
+  // The sample orders never complete either, so their totals stay as they were.
+  await createPromotion({
+    name: 'Buy 2 tees, get 1 free',
+    type: 'buy_x_get_y',
+    buyQuantity: 2,
+    getQuantity: 1,
+    getPercentOff: 100,
+    productIds: [tShirt.id],
+  });
+  await createPromotion({
+    name: 'Tee and flats set',
+    type: 'bundle',
+    discountType: 'percent',
+    discountValue: 10,
+    productIds: [tShirt.id, flats.id],
   });
 
   await createCoupon({

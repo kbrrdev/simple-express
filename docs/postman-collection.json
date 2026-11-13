@@ -1981,6 +1981,161 @@
       ]
     },
     {
+      "name": "Promotions",
+      "item": [
+        {
+          "name": "List every promotion (needs promotions.manage)",
+          "request": {
+            "method": "GET",
+            "description": "Buy X get Y and bundle offers. Shoppers see them as badges on products and as discounts in the order preview, so these routes are for admins only.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/promotions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "promotions"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Add a promotion (needs promotions.manage)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.collectionVariables.set('promotionId', data.id);",
+                  "  if (data.variants) pm.collectionVariables.set('variantId', data.variants[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Items on sale are left out. Each cart line gets at most one promotion, the largest discount first.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/promotions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "promotions"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Buy 2 tees, get 1 free\",\n  \"type\": \"buy_x_get_y\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get a promotion (needs promotions.manage)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/promotions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "promotions",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{promotionId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update a promotion (needs promotions.manage)",
+          "request": {
+            "method": "PATCH",
+            "description": "productIds and categoryIds replace the whole list when sent. Orders already placed keep their discounts.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/promotions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "promotions",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{promotionId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Buy 2 tees, get 1 free\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a promotion (needs promotions.manage)",
+          "request": {
+            "method": "DELETE",
+            "description": "Orders already placed keep their discounts.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/promotions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "promotions",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{promotionId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Payment Methods",
       "item": [
         {

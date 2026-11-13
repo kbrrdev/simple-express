@@ -110,6 +110,7 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/orders`          | Orders module                 |
 | `/api/payment-methods` | Payment methods module        |
 | `/api/products`        | Products module               |
+| `/api/promotions`      | Promotions module             |
 | `/api/reports`         | Reports module                |
 | `/api/roles`           | Roles module                  |
 | `/api/sales`           | Sales module                  |
@@ -198,6 +199,15 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - `is_automatic` coupons apply without a code. `priceWithBestDiscount` in `order.service.ts` prices the order with no discount, each automatic coupon that qualifies, and the typed coupon, and keeps the lowest total. Ties go to the earlier option, so a typed code is not used up for nothing. The preview and checkout both use it.
 - Checkout locks only the winning coupon and checks it again. If another order took its last use in between, a typed coupon gives its reason and an automatic one says the total changed.
 - `FREE_SHIPPING_MIN_CENTS` is applied in `calculateShipping`, on the subtotal after the discount. It is a shipping rule, not a discount, so it adds to a coupon.
+
+## Promotions
+
+- `promotions` holds buy X get Y and bundle offers, which apply to items bought together. Sales change prices and promotions discount carts, so they are kept apart.
+- `applyPromotions` in `promotion.service.ts` runs inside `priceWithBestDiscount`, after sale prices and before coupons. Order of discounts: sale price, promotion, then the best of the typed and automatic coupons, then shipping and tax.
+- Buy X get Y discounts the cheapest units in the cart. A bundle prices each set with the cheapest unit of each product, and `spread` splits its discount across the lines used.
+- Each line gets at most one promotion. The largest discount goes first, and later ones skip the lines it used. Items on sale are left out, and coupons treat promoted lines as on sale.
+- Categories cover their subcategories, through the same `categoryAncestors` as sales.
+- Order items copy `promotion_name` and `promotion_discount_cents`, so later changes never alter them.
 
 ## Products
 

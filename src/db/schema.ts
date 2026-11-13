@@ -10,5 +10,6 @@ export * from '../modules/coupons/coupon.schema';
 export * from '../modules/orders/order.schema';
 export * from '../modules/payment-methods/payment-method.schema';
 export * from '../modules/products/product.schema';
+export * from '../modules/promotions/promotion.schema';
 export * from '../modules/roles/role.schema';
 export * from '../modules/sales/sale.schema';
