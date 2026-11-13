@@ -20,7 +20,7 @@ type ParentMap = Map<string, string | null>;
 
 const categoryFields = { ...getTableColumns(categories), imagePath: assets.path };
 const byName = [asc(categories.name), asc(categories.id)];
-const CATEGORY_FIELDS = ['name', 'parentId', 'imageAssetId'];
+const CATEGORY_FIELDS = ['name', 'parentId', 'imageAssetId', 'icon'];
 
 function toPublicCategory({ imagePath, ...category }: Category & { imagePath: string | null }) {
   return { ...category, imageUrl: imagePath ? fileUrl(imagePath) : null };

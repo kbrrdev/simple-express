@@ -169,6 +169,12 @@ const categoryProperties = {
   name: { type: 'string', maxLength: 100, example: 'T-Shirts' },
   imageAssetId: { type: 'string', format: 'uuid', nullable: true },
   imageUrl: { type: 'string', format: 'uri', nullable: true },
+  icon: {
+    type: 'string',
+    nullable: true,
+    description: "An icon name from the frontend's icon set. Show it if set, otherwise the image.",
+    example: 'shirt',
+  },
   createdAt: { type: 'string', format: 'date-time' },
   updatedAt: { type: 'string', format: 'date-time' },
 };
@@ -179,6 +185,7 @@ const categoryRequired = [
   'name',
   'imageAssetId',
   'imageUrl',
+  'icon',
   'createdAt',
   'updatedAt',
 ];
@@ -196,6 +203,14 @@ const bodyProperties = {
     format: 'uuid',
     nullable: true,
     description: 'An uploaded asset, or null for no image',
+  },
+  icon: {
+    type: 'string',
+    maxLength: 50,
+    pattern: '^[a-z0-9]+(-[a-z0-9]+)*$',
+    nullable: true,
+    description: "An icon name from the frontend's icon set, such as Lucide's, or null for none",
+    example: 'shirt',
   },
 };
 
