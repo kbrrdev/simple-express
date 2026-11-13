@@ -14,6 +14,7 @@ import {
   categoryPaths,
   categorySchemas,
 } from '../modules/categories/category.openapi';
+import { couponParameters, couponPaths, couponSchemas } from '../modules/coupons/coupon.openapi';
 import { orderParameters, orderPaths, orderSchemas } from '../modules/orders/order.openapi';
 import {
   paymentMethodParameters,
@@ -51,6 +52,7 @@ export const openApiDocument = {
     { name: 'Products' },
     { name: 'Cart' },
     { name: 'Sales' },
+    { name: 'Coupons' },
     { name: 'Payment Methods' },
     { name: 'Orders' },
     { name: 'Addresses' },
@@ -89,6 +91,7 @@ export const openApiDocument = {
     ...productPaths,
     ...cartPaths,
     ...salePaths,
+    ...couponPaths,
     ...paymentMethodPaths,
     ...orderPaths,
     ...addressPaths,
@@ -109,6 +112,7 @@ export const openApiDocument = {
       ...productParameters,
       ...cartParameters,
       ...saleParameters,
+      ...couponParameters,
       ...orderParameters,
       ...paymentMethodParameters,
       ...addressParameters,
@@ -136,6 +140,7 @@ export const openApiDocument = {
       ...productSchemas,
       ...cartSchemas,
       ...saleSchemas,
+      ...couponSchemas,
       ...orderSchemas,
       ...paymentMethodSchemas,
       ...addressSchemas,

@@ -226,6 +226,8 @@ describe('summary', () => {
       taxCents: 5941,
       shippingCents: 3000,
       discountCents: 0,
+      saleDiscountCents: 0,
+      couponDiscountCents: 0,
       newCustomers: 0,
       taxByRate: [
         { ratePercent: 10, pricesIncludeTax: true, taxableCents: 27273, taxCents: 2727 },

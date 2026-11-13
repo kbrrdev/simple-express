@@ -86,8 +86,8 @@ export const orderPaths = {
       tags,
       summary: 'Price items with shipping and tax',
       description:
-        'Shows the final total before checkout. Send the returned `totalCents` to checkout as `expectedTotalCents`.',
-      requestBody: jsonBody('CartItems'),
+        'Shows the final total before checkout. Send the returned `totalCents` to checkout as `expectedTotalCents`. A coupon that cannot be used does not fail the preview: it is left out, and `couponError` says why. Send a bearer token or `email`, so that once-per-customer coupons can be checked.',
+      requestBody: jsonBody('PreviewOrder'),
       responses: {
         200: { description: 'The priced items', content: dataContent('OrderPreview') },
         400: badRequest,
@@ -328,7 +328,12 @@ export const orderParameters = {
 const nullableString = { type: ['string', 'null'] };
 
 const totals = {
-  subtotalCents: { type: 'integer', example: 112000 },
+  subtotalCents: {
+    type: 'integer',
+    description: 'Items at the prices paid, before any coupon',
+    example: 112000,
+  },
+  discountCents: { type: 'integer', description: 'Taken off by a coupon', example: 0 },
   shippingCents: { type: 'integer', example: 10000 },
   vatableCents: {
     type: 'integer',
@@ -350,7 +355,9 @@ const orderRequired = [
   'paymentStatus',
   'paymentDueAt',
   'payment',
+  'couponCode',
   'subtotalCents',
+  'discountCents',
   'shippingCents',
   'vatableCents',
   'taxCents',
@@ -386,6 +393,7 @@ const orderProperties = {
       qrUrl: { type: ['string', 'null'], format: 'uri' },
     },
   },
+  couponCode: { ...nullableString, example: 'WELCOME10' },
   ...totals,
   shippingAddress: {
     type: 'object',
@@ -415,12 +423,30 @@ const orderProperties = {
   updatedAt: { type: 'string', format: 'date-time' },
 };
 
+const itemInputs = {
+  type: 'array',
+  minItems: 1,
+  maxItems: 100,
+  items: {
+    type: 'object',
+    required: ['variantId', 'quantity'],
+    additionalProperties: false,
+    properties: {
+      variantId: { type: 'string', format: 'uuid' },
+      quantity: { type: 'integer', minimum: 1, maximum: 99, example: 2 },
+    },
+  },
+};
+
 export const orderSchemas = {
   OrderPreview: {
     type: 'object',
     required: [
       'items',
       'subtotalCents',
+      'discountCents',
+      'coupon',
+      'couponError',
       'shippingCents',
       'vatableCents',
       'taxCents',
@@ -430,7 +456,36 @@ export const orderSchemas = {
     ],
     properties: {
       items: { type: 'array', items: { $ref: '#/components/schemas/CartItem' } },
+      coupon: {
+        type: ['object', 'null'],
+        description: 'The coupon applied, or null',
+        required: ['code', 'discountCents', 'freeShipping'],
+        properties: {
+          code: { type: 'string', example: 'WELCOME10' },
+          discountCents: { type: 'integer', example: 20000 },
+          freeShipping: { type: 'boolean' },
+        },
+      },
+      couponError: {
+        ...nullableString,
+        description: 'Why the coupon sent could not be used, to show the shopper',
+        example: 'This coupon has expired',
+      },
       ...totals,
+    },
+  },
+  PreviewOrder: {
+    type: 'object',
+    required: ['items'],
+    additionalProperties: false,
+    properties: {
+      items: { ...itemInputs, minItems: 0 },
+      couponCode: { type: 'string', example: 'WELCOME10' },
+      email: {
+        type: 'string',
+        format: 'email',
+        description: "A guest's email, to check once-per-customer coupons",
+      },
     },
   },
   OrderItem: {
@@ -445,6 +500,7 @@ export const orderSchemas = {
       'option2Value',
       'unitPriceCents',
       'listPriceCents',
+      'discountCents',
       'quantity',
       'taxCents',
       'lineTotalCents',
@@ -464,9 +520,14 @@ export const orderSchemas = {
         description: 'The price before any sale. Equal to unitPriceCents when nothing was on sale.',
         example: 70000,
       },
+      discountCents: { type: 'integer', description: "The coupon's share of this line" },
       quantity: { type: 'integer', example: 2 },
       taxCents: { type: 'integer', example: 12000 },
-      lineTotalCents: { type: 'integer', example: 112000 },
+      lineTotalCents: {
+        type: 'integer',
+        description: 'unitPriceCents times quantity, less discountCents',
+        example: 112000,
+      },
       imageUrl: { type: ['string', 'null'], format: 'uri' },
     },
   },
@@ -513,20 +574,7 @@ export const orderSchemas = {
     properties: {
       email: { type: 'string', format: 'email', maxLength: 255, example: 'guest@example.com' },
       address: { $ref: '#/components/schemas/CreateAddress' },
-      items: {
-        type: 'array',
-        minItems: 1,
-        maxItems: 100,
-        items: {
-          type: 'object',
-          required: ['variantId', 'quantity'],
-          additionalProperties: false,
-          properties: {
-            variantId: { type: 'string', format: 'uuid' },
-            quantity: { type: 'integer', minimum: 1, maximum: 99, example: 2 },
-          },
-        },
-      },
+      items: itemInputs,
       paymentMethod: {
         type: 'string',
         format: 'uuid',
@@ -534,6 +582,12 @@ export const orderSchemas = {
       },
       expectedTotalCents: { type: 'integer', minimum: 0 },
       idempotencyKey: { type: 'string', format: 'uuid' },
+      couponCode: {
+        type: 'string',
+        pattern: '^[A-Za-z0-9_-]{3,32}$',
+        description: 'Optional. Fails with 409 and the reason when it cannot be used.',
+        example: 'WELCOME10',
+      },
     },
   },
   SubmitPayment: {
@@ -570,6 +624,12 @@ export const orderSchemas = {
         type: 'string',
         format: 'uuid',
         description: 'A new value per checkout, reused when retrying it',
+      },
+      couponCode: {
+        type: 'string',
+        pattern: '^[A-Za-z0-9_-]{3,32}$',
+        description: 'Optional. Fails with 409 and the reason when it cannot be used.',
+        example: 'WELCOME10',
       },
     },
   },

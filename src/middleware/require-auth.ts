@@ -20,6 +20,13 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   next();
 };
 
+/** Reads the login when a token is sent, for public routes that can use it. A bad token is still a 401. */
+export const optionalAuth: RequestHandler = async (req, res, next) => {
+  if (!req.headers.authorization) return next();
+
+  return requireAuth(req, res, next);
+};
+
 /** Use after requireAuth. Permissions are read on every request, so changes apply at once. */
 export function requirePermission(permission: Permission): RequestHandler {
   return (_req, res, next) => {

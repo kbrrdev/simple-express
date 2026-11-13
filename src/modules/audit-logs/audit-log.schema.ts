@@ -6,6 +6,7 @@ export const auditEntityTypes = [
   'banner',
   'blog',
   'category',
+  'coupon',
   'order',
   'payment_method',
   'product',

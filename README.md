@@ -146,6 +146,7 @@ src/
     ├── blogs/
     ├── cart/
     ├── categories/
+    ├── coupons/
     ├── orders/
     ├── payment-methods/
     ├── products/
@@ -217,7 +218,7 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, two coupons, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
 | Email                  | Role        | Password           |
 | ---------------------- | ----------- | ------------------ |
@@ -330,7 +331,7 @@ New users are customers, with no role. Staff accounts get a role, and each role 
 | `categories.manage`      | Create, edit, and delete categories                                       |
 | `blogs.manage`           | Write blogs and read drafts                                               |
 | `banners.manage`         | Manage the storefront banners                                             |
-| `promotions.manage`      | Manage sales and flash sales                                              |
+| `promotions.manage`      | Manage sales, flash sales, and coupons                                    |
 | `assets.manage`          | List, upload, and delete files                                            |
 | `payment_methods.manage` | Manage payment methods and see account numbers                            |
 | `reports.operations`     | Order status and low stock reports                                        |
@@ -422,6 +423,28 @@ A sale takes a percentage or a fixed amount off chosen products, or off whole ca
 - `stockCap` limits how many units sell at the sale price, across all its products. Once they are sold, prices go back to normal, and cancelled orders give their units back. A cart only gets the sale price when all its units of that sale fit under the cap.
 
 Shoppers see sales through the prices they already use. Public product routes, the cart, and order previews return the sale price as `priceCents` or `unitPriceCents`, with `compareAtPriceCents` for showing the old price struck through, and `saleEndsAt` for a countdown. Admin product routes return the list price, which is what admins edit. Order items keep `listPriceCents`, the price before any sale.
+
+## Coupons
+
+Shoppers enter a coupon code at checkout. Users with `promotions.manage` manage coupons.
+
+| Endpoint                  | Description                                                 |
+| ------------------------- | ----------------------------------------------------------- |
+| `GET /api/coupons`        | Every coupon, with `usedCount` and `discountGivenCents`     |
+| `GET /api/coupons/:id`    | One coupon                                                  |
+| `POST /api/coupons`       | Add a coupon                                                |
+| `PATCH /api/coupons/:id`  | Update a coupon. Past orders keep their discount.           |
+| `DELETE /api/coupons/:id` | Delete an unused coupon. A used one can only be turned off. |
+
+- `discountType` is `percent` (1 to 100, with an optional `maxDiscountCents`), `fixed` (cents), or `free_shipping`.
+- Codes are saved in capitals and match whatever case shoppers type.
+- `minSubtotalCents`, `startsAt`, `endsAt`, and `usageLimit` are optional.
+- `perCustomerLimit` is 1 by default, and `null` means no limit. Guests are counted by email, which they can change, so turn `allowGuests` off for valuable coupons.
+- Items already on sale do not count towards a coupon, for its minimum or its discount, unless `allowSaleItems` is on.
+- One coupon per order, on the whole order. The discount is split across the eligible lines in proportion to their totals, and tax follows the discounted lines.
+- Cancelling an order gives the use back. A refund after delivery does not.
+
+Send `couponCode` to `/api/orders/preview`, then to checkout. The preview never fails because of a coupon. It returns `coupon` when it applies, or `couponError` with the reason to show, such as "This coupon has expired". Send the login token, or `email` for guests, so the preview can check once-per-customer coupons. Checkout returns `409` with the same reason. Orders keep `couponCode` and `discountCents`, and each item its share in `discountCents`.
 
 ## Products
 
@@ -517,11 +540,11 @@ Customers check out with cash on delivery or a manual payment method, and guests
 
 ### Checking Out
 
-1. Call `/api/orders/preview` and show the customer the total.
-2. Call `POST /api/orders` with that total as `expectedTotalCents`, and a new `idempotencyKey`.
+1. Call `/api/orders/preview` and show the customer the total, with `couponCode` if they entered one.
+2. Call `POST /api/orders` with that total as `expectedTotalCents`, a new `idempotencyKey`, and the same `couponCode`.
 3. If the request fails or times out, retry it with the same key. A repeated key returns the original order with `200`.
 
-Checkout returns `409` if the cart is empty, an item is unavailable or short of stock, or the total has changed. Stock is reduced here, in the same transaction that creates the order.
+Checkout returns `409` if the cart is empty, an item is unavailable or short of stock, the coupon cannot be used, or the total has changed. Stock is reduced here, in the same transaction that creates the order.
 
 ### Statuses
 
@@ -628,7 +651,7 @@ Ranges take `from` and `to` as dates, such as `?from=2026-03-01&to=2026-03-31`. 
 - **Gross sales** are orders placed in the range, apart from cancelled ones.
 - **Collected** is payments received in the range, counted on the day they arrived. COD orders are collected on delivery.
 - **Refunded** is payments received in the range that were later refunded.
-- **Discounts** is what sales took off list prices, on gross sales.
+- **Discounts** is what sales took off list prices, as `saleDiscountCents`, and what coupons took off, as `couponDiscountCents`, on gross sales. Waived shipping is not included.
 
 Reports use the amounts saved on each order, so changing the tax rate never changes past figures. If the rate changes during a range, `taxByRate` in the summary lists each rate separately.
 

@@ -59,6 +59,9 @@ export const orders = pgTable(
     // Set once by markPaid, so reports can count payments by the day they arrived.
     paidAt: timestamp('paid_at', { withTimezone: true }),
     subtotalCents: bigint('subtotal_cents', { mode: 'number' }).notNull(),
+    // The coupon used, copied so the order keeps it if the coupon changes.
+    couponCode: varchar('coupon_code', { length: 32 }),
+    discountCents: bigint('discount_cents', { mode: 'number' }).notNull().default(0),
     shippingCents: integer('shipping_cents').notNull(),
     taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),
     totalCents: bigint('total_cents', { mode: 'number' }).notNull(),
@@ -113,6 +116,8 @@ export const orderItems = pgTable(
     listPriceCents: integer('list_price_cents').notNull(),
     // Lets a cancelled order give its units back to a capped sale.
     saleId: uuid('sale_id').references(() => sales.id, { onDelete: 'set null' }),
+    // The coupon's share of this line. lineTotalCents is after it.
+    discountCents: bigint('discount_cents', { mode: 'number' }).notNull().default(0),
     quantity: integer().notNull(),
     taxCents: bigint('tax_cents', { mode: 'number' }).notNull(),
     lineTotalCents: bigint('line_total_cents', { mode: 'number' }).notNull(),

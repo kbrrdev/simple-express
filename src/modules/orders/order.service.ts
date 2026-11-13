@@ -28,6 +28,13 @@ import { assets } from '../assets/asset.schema';
 import { changesBetween, recordAudit } from '../audit-logs/audit-log.service';
 import { users } from '../auth/auth.schema';
 import { cartItems } from '../cart/cart.schema';
+import {
+  applyCoupon,
+  recordRedemption,
+  releaseRedemption,
+  type AppliedCoupon,
+  type CouponCustomer,
+} from '../coupons/coupon.service';
 import { previewCart } from '../cart/cart.service';
 import type { CartItemInput } from '../cart/cart.validation';
 import { paymentMethods } from '../payment-methods/payment-method.schema';
@@ -38,7 +45,7 @@ import type { CreateOrderBody, GuestOrderBody, ListOrdersQuery } from './order.v
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Database = typeof db | Transaction;
-type PricedItem = { unitPriceCents: number; quantity: number };
+type PricedItem = { unitPriceCents: number; quantity: number; discountCents?: number };
 
 interface PlaceOrderInput {
   owner: { userId: string } | { guestEmail: string };
@@ -47,6 +54,7 @@ interface PlaceOrderInput {
   paymentMethod: string;
   expectedTotalCents: number;
   idempotencyKey: string;
+  couponCode?: string;
 }
 
 const EXPIRY_BATCH_SIZE = 100;
@@ -106,29 +114,43 @@ function priceOrder<T extends PricedItem>(items: T[], shippingCents: number) {
   const taxOf = (amount: number) =>
     Math.round((amount * rate) / (pricesIncludeTax ? 10000 + rate : 10000));
 
+  // A coupon's share comes off each line before tax, so tax follows what is actually paid.
   const lines = items.map((item) => {
-    const lineTotalCents = item.unitPriceCents * item.quantity;
-    return { ...item, lineTotalCents, taxCents: taxOf(lineTotalCents) };
+    const discountCents = item.discountCents ?? 0;
+    const lineTotalCents = item.unitPriceCents * item.quantity - discountCents;
+    return { ...item, discountCents, lineTotalCents, taxCents: taxOf(lineTotalCents) };
   });
 
-  const subtotalCents = lines.reduce((total, line) => total + line.lineTotalCents, 0);
+  const subtotalCents = lines.reduce(
+    (total, line) => total + line.unitPriceCents * line.quantity,
+    0,
+  );
+  const discountCents = lines.reduce((total, line) => total + line.discountCents, 0);
   const taxCents = lines.reduce((total, line) => total + line.taxCents, taxOf(shippingCents));
-  const beforeTax = subtotalCents + shippingCents;
+  const beforeTax = subtotalCents - discountCents + shippingCents;
 
   return {
     lines,
     rate,
     pricesIncludeTax,
     subtotalCents,
+    discountCents,
     shippingCents,
     taxCents,
     totalCents: pricesIncludeTax ? beforeTax : beforeTax + taxCents,
   };
 }
 
-function toOrderTotals({ subtotalCents, shippingCents, taxCents, totalCents }: Order) {
+function toOrderTotals({
+  subtotalCents,
+  discountCents,
+  shippingCents,
+  taxCents,
+  totalCents,
+}: Order) {
   return {
     subtotalCents,
+    discountCents,
     shippingCents,
     vatableCents: totalCents - taxCents,
     taxCents,
@@ -188,6 +210,7 @@ function toPublicOrder(order: Order, { items, qrPaths }: OrderDetails) {
             qrUrl: qrPath ? fileUrl(qrPath) : null,
           }
         : null,
+    couponCode: order.couponCode,
     ...toOrderTotals(order),
     taxRatePercent: order.taxRateBasisPoints / 100,
     pricesIncludeTax: order.pricesIncludeTax,
@@ -215,16 +238,43 @@ function toPublicOrder(order: Order, { items, qrPaths }: OrderDetails) {
   };
 }
 
-/** Prices items for the storefront. Unavailable items are shown but not charged. */
-export async function previewOrder(items: CartItemInput[]) {
+/**
+ * Prices items for the storefront. Unavailable items are shown but not charged. A coupon that
+ * cannot be used is reported in couponError instead of failing, so the cart can still be shown.
+ */
+export async function previewOrder(
+  items: CartItemInput[],
+  { couponCode, customer = null }: { couponCode?: string; customer?: CouponCustomer } = {},
+) {
   const cart = await previewCart(items);
   const available = cart.items.filter((item) => item.available);
-  const shippingCents = available.length > 0 ? await calculateShipping(available) : 0;
-  const pricing = priceOrder(available, shippingCents);
+  const result =
+    couponCode && available.length > 0
+      ? await applyCoupon(
+          db,
+          couponCode,
+          customer,
+          available.map((item) => ({ ...item, onSale: item.compareAtPriceCents !== null })),
+        )
+      : undefined;
+  const applied = result && !('error' in result) ? result : undefined;
+
+  const fullShippingCents = available.length > 0 ? await calculateShipping(available) : 0;
+  const shippingCents = applied?.freeShipping ? 0 : fullShippingCents;
+  const pricing = priceOrder(withDiscounts(available, applied), shippingCents);
 
   return {
     items: cart.items,
     subtotalCents: pricing.subtotalCents,
+    discountCents: pricing.discountCents,
+    coupon: applied
+      ? {
+          code: applied.coupon.code,
+          discountCents: applied.discountCents,
+          freeShipping: applied.freeShipping,
+        }
+      : null,
+    couponError: result && 'error' in result ? result.error : null,
     shippingCents,
     vatableCents: pricing.totalCents - pricing.taxCents,
     taxCents: pricing.taxCents,
@@ -232,6 +282,13 @@ export async function previewOrder(items: CartItemInput[]) {
     taxRatePercent: pricing.rate / 100,
     pricesIncludeTax: pricing.pricesIncludeTax,
   };
+}
+
+function withDiscounts<T extends { variantId: string }>(items: T[], applied?: AppliedCoupon) {
+  return items.map((item) => ({
+    ...item,
+    discountCents: applied?.lineDiscounts.get(item.variantId) ?? 0,
+  }));
 }
 
 function logOrderPlaced({ order, created }: { order: PlacedOrder; created: boolean }) {
@@ -326,7 +383,8 @@ function placeGuestOrder(body: GuestOrderBody) {
 }
 
 async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
-  const { owner, address, items, paymentMethod, expectedTotalCents, idempotencyKey } = input;
+  const { owner, address, items, paymentMethod, expectedTotalCents, idempotencyKey, couponCode } =
+    input;
   const method = await findPaymentMethod(tx, paymentMethod);
   recordStep('Payment method checked');
 
@@ -354,8 +412,25 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
     };
   });
 
-  const shippingCents = await calculateShipping(pricedItems, address);
-  const pricing = priceOrder(pricedItems, shippingCents);
+  const result = couponCode
+    ? await applyCoupon(
+        tx,
+        couponCode,
+        owner,
+        pricedItems.map((item) => ({
+          variantId: item.variantId,
+          lineTotalCents: item.unitPriceCents * item.quantity,
+          onSale: item.saleId !== null,
+        })),
+        true,
+      )
+    : undefined;
+  if (result && 'error' in result) throw new AppError(409, result.error);
+  if (result) recordStep('Coupon checked');
+
+  const fullShippingCents = await calculateShipping(pricedItems, address);
+  const shippingCents = result?.freeShipping ? 0 : fullShippingCents;
+  const pricing = priceOrder(withDiscounts(pricedItems, result), shippingCents);
 
   if (pricing.totalCents !== expectedTotalCents) {
     throw new AppError(409, 'The order total has changed');
@@ -384,6 +459,8 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
         ? new Date(Date.now() + env.PAYMENT_WINDOW_HOURS * 60 * 60 * 1000)
         : null,
       subtotalCents: pricing.subtotalCents,
+      couponCode: result?.coupon.code,
+      discountCents: pricing.discountCents,
       shippingCents,
       taxCents: pricing.taxCents,
       totalCents: pricing.totalCents,
@@ -416,11 +493,21 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       unitPriceCents: line.unitPriceCents,
       listPriceCents: line.listPriceCents,
       saleId: line.saleId,
+      discountCents: line.discountCents,
       quantity: line.quantity,
       taxCents: line.taxCents,
       lineTotalCents: line.lineTotalCents,
     })),
   );
+
+  if (result) {
+    await recordRedemption(tx, {
+      orderId: order.id,
+      couponId: result.coupon.id,
+      ...owner,
+      discountCents: pricing.discountCents + fullShippingCents - shippingCents,
+    });
+  }
 
   recordStep('Order saved');
 
@@ -788,6 +875,7 @@ async function cancelOrder(tx: Transaction, order: Order) {
   }
 
   await releaseSaleStock(tx, order.id);
+  await releaseRedemption(tx, order.id);
 
   const [cancelled] = await tx
     .update(orders)

@@ -9,6 +9,7 @@ import { createBlog } from '../modules/blogs/blog.service';
 import { addItem } from '../modules/cart/cart.service';
 import type { CartItemInput } from '../modules/cart/cart.validation';
 import { createCategory } from '../modules/categories/category.service';
+import { createCoupon } from '../modules/coupons/coupon.service';
 import type { OrderStatus } from '../modules/orders/order.schema';
 import {
   cancelOwnOrder,
@@ -73,17 +74,19 @@ async function checkout(
   addressId: string,
   paymentMethod: string,
   items: CartItemInput[],
+  couponCode?: string,
 ) {
   for (const item of items) {
     await addItem(userId, item);
   }
 
-  const preview = await previewOrder(items);
+  const preview = await previewOrder(items, { couponCode, customer: { userId } });
   const { order } = await createOrder(userId, {
     addressId,
     paymentMethod,
     expectedTotalCents: preview.totalCents,
     idempotencyKey: randomUUID(),
+    couponCode,
   });
 
   return order.id;
@@ -228,6 +231,20 @@ async function main() {
     productIds: [runner.id],
   });
 
+  await createCoupon({
+    code: 'WELCOME10',
+    discountType: 'percent',
+    discountValue: 10,
+    maxDiscountCents: 20000,
+    minSubtotalCents: 50000,
+  });
+  await createCoupon({
+    code: 'FREESHIP',
+    discountType: 'free_shipping',
+    minSubtotalCents: 150000,
+    perCustomerLimit: null,
+  });
+
   const gcash = await createMethod({
     providerName: 'GCash',
     accountName: 'Sample Store',
@@ -320,6 +337,12 @@ async function main() {
   await moveTo(await order('cod', basics), 'confirmed');
   await moveTo(await order('cod', shoes), 'confirmed', 'shipped');
   await moveTo(await order('cod', outfit), 'confirmed', 'shipped', 'delivered');
+  await moveTo(
+    await checkout(customer.id, home.id, 'cod', outfit, 'WELCOME10'),
+    'confirmed',
+    'shipped',
+    'delivered',
+  );
 
   const codRefunded = await order('cod', mixed);
   await moveTo(codRefunded, 'confirmed', 'shipped', 'delivered');

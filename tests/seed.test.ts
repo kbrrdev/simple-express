@@ -9,6 +9,8 @@ import {
   blogs,
   cartItems,
   categories,
+  couponRedemptions,
+  coupons,
   orderItems,
   orders,
   paymentMethods,
@@ -22,7 +24,7 @@ import {
 
 const clearDatabase = () =>
   db.execute(
-    sql`truncate table users, sessions, categories, assets, payment_methods, blogs, orders, sales cascade`,
+    sql`truncate table users, sessions, categories, assets, payment_methods, blogs, orders, sales, coupons cascade`,
   );
 
 /** Runs the real script, as `npm run db:seed` would. */
@@ -68,6 +70,8 @@ describe('seed', () => {
       blogs,
       banners,
       sales,
+      coupons,
+      couponRedemptions,
       cartItems,
       orders,
       orderItems,
