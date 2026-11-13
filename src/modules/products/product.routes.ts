@@ -6,6 +6,7 @@ import {
   addImageBody,
   createProductBody,
   imageParams,
+  listAdminProductsQuery,
   listProductsQuery,
   productParams,
   updateImageBody,
@@ -37,7 +38,7 @@ productRoutes.get(
   '/admin',
   requireAuth,
   requirePermission('products.view'),
-  validate('query', listProductsQuery),
+  validate('query', listAdminProductsQuery),
   controller.listForAdmin,
 );
 productRoutes.get(

@@ -471,6 +471,26 @@ describe('the admin product list', () => {
     expect(response.body.data[0].active).toBe(false);
     expect(response.body.data[0].variants).toHaveLength(2);
   });
+
+  it('filters by active', async () => {
+    const active = await createProduct(shirt());
+    const inactive = await createProduct({ ...shirt(), name: 'Old Shirt' });
+    await asAdmin.delete(`/api/products/${inactive.id}`).expect(204);
+
+    const onlyActive = await asAdmin.get('/api/products/admin?active=true').expect(200);
+    const onlyInactive = await asAdmin.get('/api/products/admin?active=false').expect(200);
+    const both = await asAdmin.get('/api/products/admin').expect(200);
+
+    expect(onlyActive.body.data.map((product: { id: string }) => product.id)).toEqual([active.id]);
+    expect(onlyInactive.body.data.map((product: { id: string }) => product.id)).toEqual([
+      inactive.id,
+    ]);
+    expect(onlyInactive.body.meta.total).toBe(1);
+    expect(both.body.meta.total).toBe(2);
+
+    await asAdmin.get('/api/products/admin?active=maybe').expect(400);
+    await api().get('/api/products?active=false').expect(400);
+  });
 });
 
 describe('getting a product as an admin', () => {

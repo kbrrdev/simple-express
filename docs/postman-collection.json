@@ -1101,6 +1101,11 @@
                   "key": "sort",
                   "value": "newest",
                   "disabled": true
+                },
+                {
+                  "key": "active",
+                  "value": "",
+                  "disabled": true
                 }
               ],
               "variable": []
@@ -2094,6 +2099,11 @@
                 },
                 {
                   "key": "paymentStatus",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
                   "value": "",
                   "disabled": true
                 }

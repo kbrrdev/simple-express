@@ -6,16 +6,19 @@ import {
   desc,
   eq,
   getTableColumns,
+  ilike,
   inArray,
   isNull,
   lte,
   ne,
+  or,
   sql,
   type SQL,
 } from 'drizzle-orm';
 import { env } from '../../config/env';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
+import { escapeLikePattern } from '../../lib/escape-like-pattern';
 import { hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
 import { logger } from '../../lib/logger';
 import { recordStep } from '../../lib/request-context';
@@ -605,10 +608,17 @@ export async function cancelOwnOrder(userId: string, id: string) {
   });
 }
 
-export async function listAllOrders({ page, limit, status, paymentStatus }: ListOrdersQuery) {
+export async function listAllOrders({
+  page,
+  limit,
+  status,
+  paymentStatus,
+  search,
+}: ListOrdersQuery) {
   const where = and(
     status ? eq(orders.status, status) : undefined,
     paymentStatus ? eq(orders.paymentStatus, paymentStatus) : undefined,
+    search ? matchesSearch(search) : undefined,
   );
 
   const [rows, totals] = await Promise.all([
@@ -630,6 +640,24 @@ export async function listAllOrders({ page, limit, status, paymentStatus }: List
     items: rows.map((row) => toAdminOrder(row, details)),
     total: totals[0]?.total ?? 0,
   };
+}
+
+/**
+ * Matches an order number, such as ORD-000123 or 123, or part of the customer's email, the
+ * recipient's name, or the payment reference. The subqueries name their tables in plain SQL,
+ * as Drizzle leaves table names out of the single-table count query.
+ */
+function matchesSearch(search: string) {
+  const pattern = `%${escapeLikePattern(search)}%`;
+  const orderNumber = /^(?:ord-)?0*(\d{1,9})$/i.exec(search)?.[1];
+
+  return or(
+    orderNumber ? eq(orders.orderNumber, Number(orderNumber)) : undefined,
+    ilike(orders.guestEmail, pattern),
+    ilike(orders.recipientName, pattern),
+    sql`exists (select 1 from users u where u.id = "orders"."user_id" and u.email ilike ${pattern})`,
+    sql`exists (select 1 from payments p where p.order_id = "orders"."id" and p.reference ilike ${pattern})`,
+  );
 }
 
 export async function getAnyOrder(id: string) {

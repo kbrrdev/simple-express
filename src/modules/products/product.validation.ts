@@ -8,6 +8,7 @@ export interface ListProductsQuery {
   search?: string;
   categoryId?: string;
   sort: 'newest' | 'name';
+  active?: boolean;
 }
 
 export interface VariantBody {
@@ -62,6 +63,10 @@ export const listProductsQuery = Joi.object<ListProductsQuery>({
   search: Joi.string().trim().min(1).max(255),
   categoryId: Joi.string().uuid(),
   sort: Joi.string().valid('newest', 'name').default('newest'),
+});
+
+export const listAdminProductsQuery = listProductsQuery.keys({
+  active: Joi.boolean(),
 });
 
 const name = Joi.string().trim().min(1).max(255);

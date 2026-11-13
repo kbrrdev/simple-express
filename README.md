@@ -423,24 +423,24 @@ A product with no options still has one variant, without any option values. Pric
 
 Categories can be nested up to three levels, such as Men › Shoes › Running, and products can belong to any level. Set `parentId` to place a category under another, or `null` for a top-level one. Changing it moves the category with everything below it. Names must be unique among categories with the same parent, so Men › Shoes and Women › Shoes can both exist. A category can also have an image, set with `imageAssetId` after uploading it to `/api/assets`.
 
-| Endpoint                                       | Description                                  | Access                                                  |
-| ---------------------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
-| `GET /api/categories`                          | List categories                              | Public                                                  |
-| `GET /api/categories/tree`                     | Get every category, nested                   | Public                                                  |
-| `GET /api/categories/:id`                      | Get a category and the categories above it   | Public                                                  |
-| `POST /api/categories`                         | Create a category                            | `categories.manage`                                     |
-| `PATCH /api/categories/:id`                    | Rename, move, or change a category's image   | `categories.manage`                                     |
-| `DELETE /api/categories/:id`                   | Delete an empty category                     | `categories.manage`                                     |
-| `GET /api/products`                            | List products on sale                        | Public                                                  |
-| `GET /api/products/:id`                        | Get a product on sale                        | Public                                                  |
-| `GET /api/products/admin`                      | List all products, including inactive ones   | `products.view`                                         |
-| `GET /api/products/admin/:id`                  | Get any product, including inactive variants | `products.view`                                         |
-| `POST /api/products`                           | Create a product and its variants            | `products.manage`                                       |
-| `PATCH /api/products/:id`                      | Update a product                             | `products.manage`                                       |
-| `DELETE /api/products/:id`                     | Deactivate a product                         | `products.manage`                                       |
-| `POST /api/products/:id/variants`              | Add a variant                                | `products.manage`                                       |
-| `PATCH /api/products/:id/variants/:variantId`  | Update a variant                             | `products.manage`, or `inventory.manage` for stock only |
-| `DELETE /api/products/:id/variants/:variantId` | Deactivate a variant                         | `products.manage`                                       |
+| Endpoint                                       | Description                                                                               | Access                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `GET /api/categories`                          | List categories                                                                           | Public                                                  |
+| `GET /api/categories/tree`                     | Get every category, nested                                                                | Public                                                  |
+| `GET /api/categories/:id`                      | Get a category and the categories above it                                                | Public                                                  |
+| `POST /api/categories`                         | Create a category                                                                         | `categories.manage`                                     |
+| `PATCH /api/categories/:id`                    | Rename, move, or change a category's image                                                | `categories.manage`                                     |
+| `DELETE /api/categories/:id`                   | Delete an empty category                                                                  | `categories.manage`                                     |
+| `GET /api/products`                            | List products on sale                                                                     | Public                                                  |
+| `GET /api/products/:id`                        | Get a product on sale                                                                     | Public                                                  |
+| `GET /api/products/admin`                      | List all products, including inactive ones. `?active=true` or `false` shows only one kind | `products.view`                                         |
+| `GET /api/products/admin/:id`                  | Get any product, including inactive variants                                              | `products.view`                                         |
+| `POST /api/products`                           | Create a product and its variants                                                         | `products.manage`                                       |
+| `PATCH /api/products/:id`                      | Update a product                                                                          | `products.manage`                                       |
+| `DELETE /api/products/:id`                     | Deactivate a product                                                                      | `products.manage`                                       |
+| `POST /api/products/:id/variants`              | Add a variant                                                                             | `products.manage`                                       |
+| `PATCH /api/products/:id/variants/:variantId`  | Update a variant                                                                          | `products.manage`, or `inventory.manage` for stock only |
+| `DELETE /api/products/:id/variants/:variantId` | Deactivate a variant                                                                      | `products.manage`                                       |
 
 Product lists support `page`, `limit`, `search`, `categoryId`, and `sort` (`newest` or `name`). Filtering by a category includes its subcategories.
 
@@ -476,23 +476,23 @@ A merge keeps the higher quantity for an item in both carts, so retrying one is 
 
 Customers check out with cash on delivery or a manual payment method, and guests can check out without an account. Tax and shipping are added at checkout, and an order keeps its own copy of its prices and address, so later changes never alter it.
 
-| Endpoint                                     | Description                             | Access          |
-| -------------------------------------------- | --------------------------------------- | --------------- |
-| `POST /api/orders/preview`                   | Price items with shipping and tax       | Public          |
-| `POST /api/orders`                           | Check out the cart                      | Customer        |
-| `GET /api/orders`                            | List your orders                        | Customer        |
-| `GET /api/orders/:id`                        | Get one of your orders                  | Customer        |
-| `POST /api/orders/:id/payment`               | Submit a payment reference              | Customer        |
-| `POST /api/orders/:id/cancel`                | Cancel a pending or unpaid order        | Customer        |
-| `POST /api/orders/guest`                     | Check out as a guest                    | Public          |
-| `GET /api/orders/guest/:token`               | View a guest order                      | Private link    |
-| `POST /api/orders/guest/:token/payment`      | Submit a payment reference              | Private link    |
-| `GET /api/orders/admin`                      | List all orders                         | `orders.view`   |
-| `GET /api/orders/admin/:id`                  | Get any order                           | `orders.view`   |
-| `PATCH /api/orders/admin/:id/status`         | Move an order to its next status        | `orders.manage` |
-| `POST /api/orders/admin/:id/payment/confirm` | Confirm a submitted payment             | `orders.manage` |
-| `POST /api/orders/admin/:id/payment/reject`  | Reject a payment, cancelling the order  | `orders.manage` |
-| `POST /api/orders/admin/:id/payment/refund`  | Record a refund made outside the system | `orders.refund` |
+| Endpoint                                     | Description                                                                                                                        | Access          |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `POST /api/orders/preview`                   | Price items with shipping and tax                                                                                                  | Public          |
+| `POST /api/orders`                           | Check out the cart                                                                                                                 | Customer        |
+| `GET /api/orders`                            | List your orders                                                                                                                   | Customer        |
+| `GET /api/orders/:id`                        | Get one of your orders                                                                                                             | Customer        |
+| `POST /api/orders/:id/payment`               | Submit a payment reference                                                                                                         | Customer        |
+| `POST /api/orders/:id/cancel`                | Cancel a pending or unpaid order                                                                                                   | Customer        |
+| `POST /api/orders/guest`                     | Check out as a guest                                                                                                               | Public          |
+| `GET /api/orders/guest/:token`               | View a guest order                                                                                                                 | Private link    |
+| `POST /api/orders/guest/:token/payment`      | Submit a payment reference                                                                                                         | Private link    |
+| `GET /api/orders/admin`                      | List all orders. Filter by `status` and `paymentStatus`, and `search` by order number, email, recipient name, or payment reference | `orders.view`   |
+| `GET /api/orders/admin/:id`                  | Get any order                                                                                                                      | `orders.view`   |
+| `PATCH /api/orders/admin/:id/status`         | Move an order to its next status                                                                                                   | `orders.manage` |
+| `POST /api/orders/admin/:id/payment/confirm` | Confirm a submitted payment                                                                                                        | `orders.manage` |
+| `POST /api/orders/admin/:id/payment/reject`  | Reject a payment, cancelling the order                                                                                             | `orders.manage` |
+| `POST /api/orders/admin/:id/payment/refund`  | Record a refund made outside the system                                                                                            | `orders.refund` |
 
 ### Checking Out
 
