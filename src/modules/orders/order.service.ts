@@ -30,6 +30,7 @@ import { users } from '../auth/auth.schema';
 import { cartItems } from '../cart/cart.schema';
 import {
   applyCoupon,
+  findAutomaticCoupons,
   recordRedemption,
   releaseRedemption,
   type AppliedCoupon,
@@ -100,11 +101,23 @@ function guestOrderKey({ email, idempotencyKey }: GuestOrderBody) {
   return and(eq(orders.guestEmail, email), eq(orders.idempotencyKey, idempotencyKey));
 }
 
-/** The only place that sets the fee. A courier's rates would replace this body. */
+/**
+ * The only place that sets the fee. A courier's rates would replace this body. Free shipping
+ * is checked after discounts, so a coupon cannot push an order under the amount and keep it.
+ */
 export async function calculateShipping(
-  _items: PricedItem[],
+  items: PricedItem[],
   _address?: { province: string },
 ): Promise<number> {
+  const subtotalCents = items.reduce(
+    (total, item) => total + item.unitPriceCents * item.quantity - (item.discountCents ?? 0),
+    0,
+  );
+
+  if (env.FREE_SHIPPING_MIN_CENTS !== undefined && subtotalCents >= env.FREE_SHIPPING_MIN_CENTS) {
+    return 0;
+  }
+
   return env.SHIPPING_FEE_CENTS;
 }
 
@@ -247,21 +260,13 @@ export async function previewOrder(
   { couponCode, customer = null }: { couponCode?: string; customer?: CouponCustomer } = {},
 ) {
   const cart = await previewCart(items);
-  const available = cart.items.filter((item) => item.available);
-  const result =
-    couponCode && available.length > 0
-      ? await applyCoupon(
-          db,
-          couponCode,
-          customer,
-          available.map((item) => ({ ...item, onSale: item.compareAtPriceCents !== null })),
-        )
-      : undefined;
-  const applied = result && !('error' in result) ? result : undefined;
-
-  const fullShippingCents = available.length > 0 ? await calculateShipping(available) : 0;
-  const shippingCents = applied?.freeShipping ? 0 : fullShippingCents;
-  const pricing = priceOrder(withDiscounts(available, applied), shippingCents);
+  const available = cart.items
+    .filter((item) => item.available)
+    .map((item) => ({ ...item, onSale: item.compareAtPriceCents !== null }));
+  const { applied, couponError, pricing } =
+    available.length > 0
+      ? await priceWithBestDiscount(db, available, { couponCode, customer })
+      : { applied: undefined, couponError: null, pricing: priceOrder([], 0) };
 
   return {
     items: cart.items,
@@ -272,10 +277,11 @@ export async function previewOrder(
           code: applied.coupon.code,
           discountCents: applied.discountCents,
           freeShipping: applied.freeShipping,
+          automatic: applied.coupon.isAutomatic,
         }
       : null,
-    couponError: result && 'error' in result ? result.error : null,
-    shippingCents,
+    couponError,
+    shippingCents: pricing.shippingCents,
     vatableCents: pricing.totalCents - pricing.taxCents,
     taxCents: pricing.taxCents,
     totalCents: pricing.totalCents,
@@ -284,11 +290,88 @@ export async function previewOrder(
   };
 }
 
-function withDiscounts<T extends { variantId: string }>(items: T[], applied?: AppliedCoupon) {
-  return items.map((item) => ({
+interface DiscountItem extends PricedItem {
+  variantId: string;
+  onSale: boolean;
+}
+
+/**
+ * Prices the order with whichever discount gives the lowest total: none, the typed coupon, or an
+ * automatic one. A tie goes to the earlier option, so a typed code is not used up for nothing.
+ * Checkout locks the winner and checks its limits again, and refuses a typed coupon that fails.
+ */
+async function priceWithBestDiscount<T extends DiscountItem>(
+  database: Database,
+  items: T[],
+  options: {
+    couponCode?: string;
+    customer: CouponCustomer;
+    address?: { province: string };
+    lock?: boolean;
+  },
+) {
+  const { couponCode, customer, address, lock = false } = options;
+  const lines = items.map((item) => ({
+    variantId: item.variantId,
+    lineTotalCents: item.unitPriceCents * item.quantity,
+    onSale: item.onSale,
+  }));
+
+  const typed = couponCode ? await applyCoupon(database, couponCode, customer, lines) : undefined;
+  if (lock && typed && 'error' in typed) throw new AppError(409, typed.error);
+
+  const typedCoupon = typed && !('error' in typed) ? typed : undefined;
+  const candidates = [
+    undefined,
+    ...(await findAutomaticCoupons(database, customer, lines)),
+    ...(typedCoupon ? [typedCoupon] : []),
+  ];
+
+  let best = await priceWith(items, candidates[0], address);
+  let applied: AppliedCoupon | undefined;
+  for (const option of candidates.slice(1)) {
+    const priced = await priceWith(items, option, address);
+    if (priced.pricing.totalCents < best.pricing.totalCents) {
+      best = priced;
+      applied = option;
+    }
+  }
+
+  if (lock && applied) {
+    const locked = await applyCoupon(database, applied.coupon.code, customer, lines, true);
+    if ('error' in locked) {
+      // A shopper who typed the code gets its reason. An automatic one only changed the total.
+      throw new AppError(
+        409,
+        applied === typedCoupon ? locked.error : 'The order total has changed',
+      );
+    }
+    applied = locked;
+  }
+
+  let couponError = typed && 'error' in typed ? typed.error : null;
+  if (typedCoupon && applied?.coupon.id !== typedCoupon.coupon.id) {
+    couponError = applied
+      ? `Your cart already gets a better discount (${applied.coupon.code})`
+      : 'This coupon does not lower your total';
+  }
+
+  return { applied, couponError, ...best };
+}
+
+async function priceWith<T extends DiscountItem>(
+  items: T[],
+  applied: AppliedCoupon | undefined,
+  address?: { province: string },
+) {
+  const discounted = items.map((item) => ({
     ...item,
     discountCents: applied?.lineDiscounts.get(item.variantId) ?? 0,
   }));
+  const regularShippingCents = await calculateShipping(discounted, address);
+  const pricing = priceOrder(discounted, applied?.freeShipping ? 0 : regularShippingCents);
+
+  return { pricing, regularShippingCents };
 }
 
 function logOrderPlaced({ order, created }: { order: PlacedOrder; created: boolean }) {
@@ -409,28 +492,22 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       listPriceCents: item.unitPriceCents,
       unitPriceCents: sale?.priceCents ?? item.unitPriceCents,
       saleId: sale?.saleId ?? null,
+      onSale: Boolean(sale?.saleId),
     };
   });
 
-  const result = couponCode
-    ? await applyCoupon(
-        tx,
-        couponCode,
-        owner,
-        pricedItems.map((item) => ({
-          variantId: item.variantId,
-          lineTotalCents: item.unitPriceCents * item.quantity,
-          onSale: item.saleId !== null,
-        })),
-        true,
-      )
-    : undefined;
-  if (result && 'error' in result) throw new AppError(409, result.error);
-  if (result) recordStep('Coupon checked');
-
-  const fullShippingCents = await calculateShipping(pricedItems, address);
-  const shippingCents = result?.freeShipping ? 0 : fullShippingCents;
-  const pricing = priceOrder(withDiscounts(pricedItems, result), shippingCents);
+  const {
+    applied: result,
+    pricing,
+    regularShippingCents,
+  } = await priceWithBestDiscount(tx, pricedItems, {
+    couponCode,
+    customer: owner,
+    address,
+    lock: true,
+  });
+  const { shippingCents } = pricing;
+  if (result) recordStep('Discount checked');
 
   if (pricing.totalCents !== expectedTotalCents) {
     throw new AppError(409, 'The order total has changed');
@@ -505,7 +582,7 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       orderId: order.id,
       couponId: result.coupon.id,
       ...owner,
-      discountCents: pricing.discountCents + fullShippingCents - shippingCents,
+      discountCents: pricing.discountCents + regularShippingCents - shippingCents,
     });
   }
 

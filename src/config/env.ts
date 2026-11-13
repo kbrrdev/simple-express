@@ -23,6 +23,7 @@ interface Env {
   TAX_RATE_PERCENT: number;
   PRICES_INCLUDE_TAX: boolean;
   SHIPPING_FEE_CENTS: number;
+  FREE_SHIPPING_MIN_CENTS?: number;
   PAYMENT_WINDOW_HOURS: number;
   MAX_OPEN_UNPAID_ORDERS: number;
   UPLOADS_DIR: string;
@@ -88,6 +89,7 @@ const envSchema = Joi.object<Env>({
   TAX_RATE_PERCENT: Joi.number().min(0).max(100).precision(2).empty('').default(12),
   PRICES_INCLUDE_TAX: Joi.boolean().empty('').default(true),
   SHIPPING_FEE_CENTS: Joi.number().integer().min(0).empty('').default(10000),
+  FREE_SHIPPING_MIN_CENTS: Joi.number().integer().min(0).empty(''),
   PAYMENT_WINDOW_HOURS: Joi.number().integer().min(1).empty('').default(24),
   MAX_OPEN_UNPAID_ORDERS: Joi.number().integer().min(1).empty('').default(5),
   UPLOADS_DIR: Joi.string().empty('').default('uploads'),

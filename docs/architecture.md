@@ -195,6 +195,9 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - The preview reports a coupon that cannot be used in `couponError` instead of failing. `optionalAuth` lets it read the login, and a bad token is still a `401`.
 - Cancelling an order deletes its redemption. A redemption's foreign key stops a used coupon being deleted.
 - Orders copy `coupon_code` and `discount_cents`, and each item its share, so later changes to the coupon never alter them.
+- `is_automatic` coupons apply without a code. `priceWithBestDiscount` in `order.service.ts` prices the order with no discount, each automatic coupon that qualifies, and the typed coupon, and keeps the lowest total. Ties go to the earlier option, so a typed code is not used up for nothing. The preview and checkout both use it.
+- Checkout locks only the winning coupon and checks it again. If another order took its last use in between, a typed coupon gives its reason and an automatic one says the total changed.
+- `FREE_SHIPPING_MIN_CENTS` is applied in `calculateShipping`, on the subtotal after the discount. It is a shipping rule, not a discount, so it adds to a coupon.
 
 ## Products
 

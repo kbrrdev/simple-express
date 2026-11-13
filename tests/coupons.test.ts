@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
+import { env } from '../src/config/env';
 import { db, pool } from '../src/db';
 import {
   auditLogs,
@@ -173,6 +174,10 @@ beforeEach(async () => {
       await api().post('/api/addresses').set(bearer(user.token)).send(address).expect(201)
     ).body.data.id;
   }
+});
+
+afterEach(() => {
+  env.FREE_SHIPPING_MIN_CENTS = undefined;
 });
 
 afterAll(async () => {
@@ -428,6 +433,145 @@ describe('limits', () => {
       .set(bearer('not-a-token'))
       .send({ items: [] })
       .expect(401);
+  });
+});
+
+describe('automatic discounts', () => {
+  const auto = (code: string, discountValue: number, minSubtotalCents: number, body = {}) =>
+    createCoupon({
+      code,
+      discountType: 'fixed',
+      discountValue,
+      minSubtotalCents,
+      isAutomatic: true,
+      ...body,
+    });
+
+  it('apply without a code, and the best tier wins', async () => {
+    await auto('SPEND1500', 20000, 150000);
+    await auto('SPEND5000', 70000, 500000);
+
+    const two = await preview([{ variantId: shirt, quantity: 2 }]);
+    const five = await preview([{ variantId: shirt, quantity: 5 }]);
+    const one = await preview([{ variantId: shirt, quantity: 1 }]);
+
+    expect(two.body.data).toMatchObject({
+      discountCents: 20000,
+      coupon: { code: 'SPEND1500', automatic: true },
+      couponError: null,
+    });
+    expect(five.body.data.coupon.code).toBe('SPEND5000');
+    expect(one.body.data.coupon).toBeNull();
+  });
+
+  it('give the shopper whichever of them or a typed coupon is better', async () => {
+    await auto('AUTO200', 20000, 150000);
+    await createCoupon({ code: 'TIE10', discountValue: 10 });
+    await createCoupon({ code: 'BETTER15', discountValue: 15 });
+    const items = [{ variantId: shirt, quantity: 2 }];
+
+    const tie = await preview(items, { couponCode: 'TIE10' });
+    expect(tie.body.data).toMatchObject({
+      discountCents: 20000,
+      coupon: { code: 'AUTO200', automatic: true },
+      couponError: 'Your cart already gets a better discount (AUTO200)',
+    });
+
+    const better = await preview(items, { couponCode: 'BETTER15' });
+    expect(better.body.data).toMatchObject({
+      discountCents: 30000,
+      coupon: { code: 'BETTER15', automatic: false },
+      couponError: null,
+    });
+  });
+
+  it('keep a losing typed coupon unused at checkout', async () => {
+    await auto('AUTO200', 20000, 150000);
+    await createCoupon({ code: 'TIE10', discountValue: 10 });
+
+    const order = (
+      await checkout([{ variantId: shirt, quantity: 2 }], 200000 - 20000 + shipping, 'TIE10')
+    ).body.data;
+
+    expect(order.couponCode).toBe('AUTO200');
+    const list = await api().get(url).set(bearer(adminToken)).expect(200);
+    const usage = Object.fromEntries(
+      list.body.data.map((coupon: { code: string; usedCount: number }) => [
+        coupon.code,
+        coupon.usedCount,
+      ]),
+    );
+    expect(usage).toEqual({ AUTO200: 1, TIE10: 0 });
+  });
+
+  it('work on every order by default', async () => {
+    const coupon = await auto('AUTO200', 20000, 150000);
+    expect(coupon.perCustomerLimit).toBeNull();
+
+    const total = 200000 - 20000 + shipping;
+    await checkout([{ variantId: shirt, quantity: 2 }], total, undefined);
+    await checkout([{ variantId: shirt, quantity: 2 }], total, undefined);
+  });
+
+  it('stop at their limits, and only one parallel order gets the last use', async () => {
+    await auto('ONCE', 20000, 150000, { usageLimit: 1 });
+    const items = [{ variantId: shirt, quantity: 2 }];
+    const discounted = 200000 - 20000 + shipping;
+
+    const responses = await Promise.all([
+      checkout(items, discounted, undefined, null),
+      checkout(items, discounted, undefined, null, other),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+
+    const after = await preview(items);
+    expect(after.body.data.coupon).toBeNull();
+  });
+});
+
+describe('free shipping over an amount', () => {
+  it('waives shipping once the subtotal after discounts reaches it', async () => {
+    env.FREE_SHIPPING_MIN_CENTS = 150000;
+
+    const over = await preview([{ variantId: shirt, quantity: 2 }]);
+    const under = await preview([{ variantId: shirt, quantity: 1 }]);
+
+    expect(over.body.data).toMatchObject({ shippingCents: 0, totalCents: 200000 });
+    expect(under.body.data.shippingCents).toBe(shipping);
+  });
+
+  it('adds to a coupon, unless the coupon takes the order under the amount', async () => {
+    env.FREE_SHIPPING_MIN_CENTS = 150000;
+    await createCoupon({});
+    await createCoupon({ code: 'LESS600', discountType: 'fixed', discountValue: 60000 });
+    const items = [{ variantId: shirt, quantity: 2 }];
+
+    const stacked = await preview(items, { couponCode: 'SAVE10' });
+    const under = await preview(items, { couponCode: 'LESS600' });
+
+    expect(stacked.body.data).toMatchObject({ discountCents: 20000, shippingCents: 0 });
+    expect(under.body.data).toMatchObject({
+      discountCents: 60000,
+      shippingCents: shipping,
+      totalCents: 140000 + shipping,
+    });
+
+    const order = (await checkout(items, 180000, 'SAVE10')).body.data;
+    expect(order).toMatchObject({ shippingCents: 0, totalCents: 180000 });
+  });
+
+  it('says when a coupon does not lower the total', async () => {
+    env.FREE_SHIPPING_MIN_CENTS = 150000;
+    await createCoupon({ code: 'FREESHIP', discountType: 'free_shipping' });
+
+    const response = await preview([{ variantId: shirt, quantity: 2 }], {
+      couponCode: 'FREESHIP',
+    });
+
+    expect(response.body.data).toMatchObject({
+      coupon: null,
+      couponError: 'This coupon does not lower your total',
+    });
   });
 });
 

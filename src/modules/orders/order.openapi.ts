@@ -458,12 +458,17 @@ export const orderSchemas = {
       items: { type: 'array', items: { $ref: '#/components/schemas/CartItem' } },
       coupon: {
         type: ['object', 'null'],
-        description: 'The coupon applied, or null',
-        required: ['code', 'discountCents', 'freeShipping'],
+        description:
+          'The discount applied, or null. Only one applies: the typed coupon or an automatic one, whichever gives the lower total.',
+        required: ['code', 'discountCents', 'freeShipping', 'automatic'],
         properties: {
           code: { type: 'string', example: 'WELCOME10' },
           discountCents: { type: 'integer', example: 20000 },
           freeShipping: { type: 'boolean' },
+          automatic: {
+            type: 'boolean',
+            description: 'True when the discount applied itself, without a code',
+          },
         },
       },
       couponError: {

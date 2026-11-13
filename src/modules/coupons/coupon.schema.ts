@@ -36,6 +36,8 @@ export const coupons = pgTable(
     perCustomerLimit: integer('per_customer_limit').default(1),
     allowSaleItems: boolean('allow_sale_items').notNull().default(false),
     allowGuests: boolean('allow_guests').notNull().default(true),
+    // Applies without a code whenever the cart qualifies. Its code is the label shoppers see.
+    isAutomatic: boolean('is_automatic').notNull().default(false),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })

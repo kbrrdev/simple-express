@@ -33,6 +33,7 @@ export default defineConfig({
       TAX_RATE_PERCENT: '12',
       PRICES_INCLUDE_TAX: 'true',
       SHIPPING_FEE_CENTS: '10000',
+      FREE_SHIPPING_MIN_CENTS: '',
       PAYMENT_WINDOW_HOURS: '24',
       MAX_OPEN_UNPAID_ORDERS: '1000',
       UPLOADS_DIR: join(tmpdir(), 'simple-express-test-uploads'),

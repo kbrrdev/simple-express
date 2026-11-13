@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, sql, sum } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql, sum } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { FOREIGN_KEY_VIOLATION, hasDbErrorCode, UNIQUE_VIOLATION } from '../../lib/db-errors';
@@ -22,6 +22,7 @@ const COUPON_FIELDS = [
   'perCustomerLimit',
   'allowSaleItems',
   'allowGuests',
+  'isAutomatic',
   'isActive',
 ];
 
@@ -124,6 +125,27 @@ export async function applyCoupon(
   };
 }
 
+/** The automatic coupons this cart qualifies for. Stores have few, so each is checked in turn. */
+export async function findAutomaticCoupons(
+  database: Database,
+  customer: CouponCustomer,
+  lines: CouponLine[],
+) {
+  const automatic = await database
+    .select({ code: coupons.code })
+    .from(coupons)
+    .where(and(eq(coupons.isAutomatic, true), eq(coupons.isActive, true)))
+    .orderBy(asc(coupons.code));
+
+  const applied: AppliedCoupon[] = [];
+  for (const { code } of automatic) {
+    const result = await applyCoupon(database, code, customer, lines);
+    if (!('error' in result)) applied.push(result);
+  }
+
+  return applied;
+}
+
 /**
  * Splits a discount across lines in proportion to their totals, so that each line's tax and any
  * refund stay right. Rounding leftovers go to the largest lines, never past a line's total.
@@ -213,7 +235,10 @@ export async function getCoupon(id: string) {
 }
 
 export async function createCoupon(data: CreateCouponBody) {
-  const values = checkCoupon(data);
+  // An automatic discount should work on every order unless the admin says otherwise.
+  const perCustomerLimit =
+    data.perCustomerLimit === undefined && data.isAutomatic ? null : data.perCustomerLimit;
+  const values = checkCoupon({ ...data, perCustomerLimit });
 
   try {
     const id = await db.transaction(async (tx) => {
