@@ -128,8 +128,12 @@ async function main() {
     postalCode: '6000',
   });
 
-  const men = await createCategory({ name: 'Men', imageAssetId: await newImage() });
-  const women = await createCategory({ name: 'Women', imageAssetId: await newImage() });
+  const men = await createCategory({ name: 'Men', icon: 'shirt', imageAssetId: await newImage() });
+  const women = await createCategory({
+    name: 'Women',
+    icon: 'shopping-bag',
+    imageAssetId: await newImage(),
+  });
   const accessories = await createCategory({
     name: 'Accessories',
     imageAssetId: await newImage(),

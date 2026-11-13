@@ -105,6 +105,25 @@ describe('categories', () => {
     await asAdmin.patch(`/api/categories/${bags.body.data.id}`, { name: 'T-Shirts' }).expect(409);
   });
 
+  it('saves an icon name, returns it everywhere, and clears it with null', async () => {
+    const bags = await asAdmin
+      .post('/api/categories', { name: 'Bags', icon: 'shopping-bag' })
+      .expect(201);
+    const id = bags.body.data.id;
+    expect(bags.body.data).toMatchObject({ icon: 'shopping-bag', imageUrl: null });
+
+    const tree = await api().get('/api/categories/tree').expect(200);
+    const node = tree.body.data.find((category: { id: string }) => category.id === id);
+    expect(node.icon).toBe('shopping-bag');
+
+    const cleared = await asAdmin.patch(`/api/categories/${id}`, { icon: null }).expect(200);
+    expect(cleared.body.data.icon).toBeNull();
+
+    for (const icon of ['Shopping Bag', 'bag_icon', '-bag', 'a'.repeat(51)]) {
+      await asAdmin.post('/api/categories', { name: 'Hats', icon }).expect(400);
+    }
+  });
+
   it('can be deleted only when no product uses it', async () => {
     const product = await createProduct(mug());
 

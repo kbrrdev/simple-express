@@ -843,7 +843,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"T-Shirts\"\n}",
+              "raw": "{\n  \"name\": \"T-Shirts\",\n  \"icon\": \"shirt\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -929,7 +929,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"T-Shirts\"\n}",
+              "raw": "{\n  \"name\": \"T-Shirts\",\n  \"icon\": \"shirt\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

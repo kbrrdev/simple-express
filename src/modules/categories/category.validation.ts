@@ -11,6 +11,7 @@ export interface CreateCategoryBody {
   name: string;
   parentId?: string | null;
   imageAssetId?: string | null;
+  icon?: string | null;
 }
 
 export type UpdateCategoryBody = Partial<CreateCategoryBody>;
@@ -27,15 +28,22 @@ export const listCategoriesQuery = Joi.object<ListCategoriesQuery>({
 const name = Joi.string().trim().min(1).max(100);
 const parentId = Joi.string().uuid().allow(null);
 const imageAssetId = Joi.string().uuid().allow(null);
+const icon = Joi.string()
+  .pattern(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+  .max(50)
+  .allow(null)
+  .messages({ 'string.pattern.base': '{{#label}} must be an icon name such as shopping-bag' });
 
 export const createCategoryBody = Joi.object<CreateCategoryBody>({
   name: name.required(),
   parentId,
   imageAssetId,
+  icon,
 });
 
 export const updateCategoryBody = Joi.object<UpdateCategoryBody>({
   name,
   parentId,
   imageAssetId,
+  icon,
 }).min(1);

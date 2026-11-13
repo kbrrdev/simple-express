@@ -10,6 +10,8 @@ export const categories = pgTable(
     }),
     name: varchar({ length: 100 }).notNull(),
     imageAssetId: uuid('image_asset_id').references(() => assets.id, { onDelete: 'restrict' }),
+    // A name from the frontend's icon set, such as Lucide's. Frontends show it before the image.
+    icon: varchar({ length: 50 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
