@@ -218,7 +218,7 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, two coupons, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, two coupons and an automatic discount, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
 | Email                  | Role        | Password           |
 | ---------------------- | ----------- | ------------------ |
@@ -444,6 +444,12 @@ Shoppers enter a coupon code at checkout. Users with `promotions.manage` manage 
 - One coupon per order, on the whole order. The discount is split across the eligible lines in proportion to their totals, and tax follows the discounted lines.
 - Cancelling an order gives the use back. A refund after delivery does not.
 
+### Automatic Discounts
+
+A coupon with `isAutomatic` applies without a code whenever the cart qualifies, such as "₱200 off over ₱2,000". Its code is the label shoppers see. Tiers are several automatic coupons with different minimums. Automatic coupons have no per-customer limit unless one is set.
+
+One discount applies per order: the typed coupon or an automatic one, whichever gives the lower total. A tie goes to the automatic one, so the shopper's code is not used up. When the typed coupon loses, the preview's `couponError` says so, such as "Your cart already gets a better discount (SPEND2000)", and `coupon.automatic` tells the storefront the discount applied itself.
+
 Send `couponCode` to `/api/orders/preview`, then to checkout. The preview never fails because of a coupon. It returns `coupon` when it applies, or `couponError` with the reason to show, such as "This coupon has expired". Send the login token, or `email` for guests, so the preview can check once-per-customer coupons. Checkout returns `409` with the same reason. Orders keep `couponCode` and `discountCents`, and each item its share in `discountCents`.
 
 ## Products
@@ -624,11 +630,12 @@ No payment provider is connected. To add one, such as Stripe:
 
 Set these in `.env`:
 
-| Variable             | Default | Description                                                              |
-| -------------------- | ------- | ------------------------------------------------------------------------ |
-| `TAX_RATE_PERCENT`   | `12`    | Tax rate. Use `0` to charge none, and decimals such as `7.5` are allowed |
-| `PRICES_INCLUDE_TAX` | `true`  | `true` means prices contain tax, and `false` adds it on top              |
-| `SHIPPING_FEE_CENTS` | `10000` | Flat shipping fee                                                        |
+| Variable                  | Default | Description                                                                        |
+| ------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `TAX_RATE_PERCENT`        | `12`    | Tax rate. Use `0` to charge none, and decimals such as `7.5` are allowed           |
+| `PRICES_INCLUDE_TAX`      | `true`  | `true` means prices contain tax, and `false` adds it on top                        |
+| `SHIPPING_FEE_CENTS`      | `10000` | Flat shipping fee                                                                  |
+| `FREE_SHIPPING_MIN_CENTS` | empty   | Orders at least this much after discounts ship free. Empty always charges shipping |
 
 Tax applies to items and shipping. Orders show `vatableCents`, `taxCents`, and `totalCents`, and keep the rate and fee they were placed with. This is an order summary, not an official invoice.
 

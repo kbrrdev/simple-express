@@ -239,6 +239,13 @@ async function main() {
     minSubtotalCents: 50000,
   });
   await createCoupon({
+    code: 'SPEND5000',
+    discountType: 'fixed',
+    discountValue: 50000,
+    minSubtotalCents: 500000,
+    isAutomatic: true,
+  });
+  await createCoupon({
     code: 'FREESHIP',
     discountType: 'free_shipping',
     minSubtotalCents: 150000,

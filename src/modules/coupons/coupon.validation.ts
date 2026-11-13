@@ -12,6 +12,7 @@ export interface CreateCouponBody {
   perCustomerLimit?: number | null;
   allowSaleItems?: boolean;
   allowGuests?: boolean;
+  isAutomatic?: boolean;
   isActive?: boolean;
 }
 
@@ -42,6 +43,7 @@ const fields = {
   perCustomerLimit: count,
   allowSaleItems: Joi.boolean(),
   allowGuests: Joi.boolean(),
+  isAutomatic: Joi.boolean(),
   isActive: Joi.boolean(),
 };
 

@@ -164,13 +164,18 @@ const couponFields = {
   endsAt: date,
   usageLimit: nullableCount('Total uses across all shoppers. Null means no limit.'),
   perCustomerLimit: nullableCount(
-    'Uses per account or guest email. Null means no limit. Guests are counted by email, which they can change.',
+    'Uses per account or guest email. Null means no limit. Defaults to 1, or no limit for automatic coupons. Guests are counted by email, which they can change.',
   ),
   allowSaleItems: {
     type: 'boolean',
     description: 'Whether items already on sale count towards the coupon',
   },
   allowGuests: { type: 'boolean' },
+  isAutomatic: {
+    type: 'boolean',
+    description:
+      'Applies without a code whenever the cart qualifies, and its code is shown as the label. Shoppers get whichever discount gives the lowest total.',
+  },
   isActive: { type: 'boolean' },
 };
 
@@ -203,9 +208,9 @@ export const couponSchemas = {
     additionalProperties: false,
     properties: {
       ...couponFields,
-      perCustomerLimit: { ...couponFields.perCustomerLimit, default: 1 },
       allowSaleItems: { ...couponFields.allowSaleItems, default: false },
       allowGuests: { type: 'boolean', default: true },
+      isAutomatic: { ...couponFields.isAutomatic, default: false },
       isActive: { type: 'boolean', default: true },
     },
   },

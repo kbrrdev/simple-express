@@ -1,0 +1,1 @@
+ALTER TABLE "coupons" ADD COLUMN "is_automatic" boolean DEFAULT false NOT NULL;
