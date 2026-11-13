@@ -106,7 +106,16 @@ export const productPaths = {
       tags,
       summary: 'List all products, including inactive ones (needs products.view)',
       security,
-      parameters: listParameters,
+      parameters: [
+        ...listParameters,
+        {
+          name: 'active',
+          in: 'query',
+          description:
+            "Only active or only inactive products, by the product's own flag. Leave out for both.",
+          schema: { type: 'boolean' },
+        },
+      ],
       responses: {
         200: { description: 'A page of products', content: productPageContent },
         400: badRequest,

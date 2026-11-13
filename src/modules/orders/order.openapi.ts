@@ -193,6 +193,13 @@ export const orderPaths = {
           in: 'query',
           schema: { type: 'string', enum: ['unpaid', 'submitted', 'paid', 'refunded'] },
         },
+        {
+          name: 'search',
+          in: 'query',
+          description:
+            "An order number, such as ORD-000123 or 123, or part of the customer's email, the recipient's name, or the payment reference. Ignores case.",
+          schema: { type: 'string', minLength: 1, maxLength: 255 },
+        },
       ],
       responses: {
         200: { description: 'A page of orders', content: pageContent('AdminOrder') },

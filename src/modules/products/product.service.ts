@@ -54,12 +54,13 @@ const isPublic = and(
 );
 
 export async function listProducts(
-  { page, limit, search, categoryId, sort }: ListProductsQuery,
+  { page, limit, search, categoryId, sort, active }: ListProductsQuery,
   includeInactive = false,
 ) {
   const categoryIds = categoryId ? await findCategoryAndDescendantIds(categoryId) : undefined;
   const where = and(
     includeInactive ? undefined : isPublic,
+    includeInactive && active !== undefined ? eq(products.active, active) : undefined,
     categoryIds ? inArray(products.categoryId, categoryIds) : undefined,
     search ? ilike(products.name, `%${escapeLikePattern(search)}%`) : undefined,
   );

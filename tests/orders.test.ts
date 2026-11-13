@@ -11,6 +11,7 @@ import {
   categories,
   orderItems,
   orders,
+  payments,
   products,
   productVariants,
   SUPER_ADMIN_ROLE_ID,
@@ -818,6 +819,71 @@ describe('admin orders', () => {
       .expect(200);
 
     expect(response.body.data.map((row: { id: string }) => row.id)).toEqual([order.id]);
+  });
+
+  describe('search', () => {
+    const search = (term: string) =>
+      api().get('/api/orders/admin').query({ search: term }).set(bearer(adminToken)).expect(200);
+    const ids = (response: { body: { data: { id: string }[] } }) =>
+      response.body.data.map((row) => row.id);
+
+    let mine: { id: string; orderNumber: string };
+    let other: { id: string };
+
+    beforeEach(async () => {
+      mine = await placeOrder(1);
+      await addToCart(medium, 1, otherToken);
+      other = (await checkout(122000, { addressId: otherAddressId }, otherToken).expect(201)).body
+        .data;
+      await db.update(orders).set({ recipientName: 'Maria Santos' }).where(eq(orders.id, other.id));
+    });
+
+    it('finds an order by its number, with or without the prefix and zeros', async () => {
+      const number = Number(mine.orderNumber.slice(4));
+
+      for (const term of [mine.orderNumber, mine.orderNumber.toLowerCase(), String(number)]) {
+        expect(ids(await search(term))).toEqual([mine.id]);
+      }
+      expect(ids(await search('999999'))).toEqual([]);
+    });
+
+    it("finds orders by part of the customer's email or the recipient's name", async () => {
+      expect(ids(await search('OTHER@'))).toEqual([other.id]);
+      expect(ids(await search('santos'))).toEqual([other.id]);
+      expect(ids(await search('dela cruz'))).toEqual([mine.id]);
+    });
+
+    it('finds guest orders by email', async () => {
+      await db
+        .update(orders)
+        .set({ userId: null, guestEmail: 'walk-in@example.com' })
+        .where(eq(orders.id, mine.id));
+
+      expect(ids(await search('walk-in'))).toEqual([mine.id]);
+    });
+
+    it('finds an order by its payment reference', async () => {
+      await db
+        .insert(payments)
+        .values({ orderId: other.id, amountCents: 122000, provider: 'GCash', reference: 'GC-777' });
+
+      expect(ids(await search('gc-777'))).toEqual([other.id]);
+    });
+
+    it('matches % and _ literally, and combines with the other filters', async () => {
+      expect(ids(await search('%'))).toEqual([]);
+      expect(ids(await search('_'))).toEqual([]);
+
+      await setStatus(mine.id, 'confirmed').expect(200);
+      const response = await api()
+        .get('/api/orders/admin')
+        .query({ search: 'example.com', status: 'confirmed' })
+        .set(bearer(adminToken))
+        .expect(200);
+
+      expect(ids(response)).toEqual([mine.id]);
+      expect(response.body.meta.total).toBe(1);
+    });
   });
 
   it('gets any order', async () => {

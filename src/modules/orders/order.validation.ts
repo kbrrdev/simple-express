@@ -12,6 +12,7 @@ export interface ListOrdersQuery {
   limit: number;
   status?: OrderStatus;
   paymentStatus?: Order['paymentStatus'];
+  search?: string;
 }
 
 export interface CreateOrderBody {
@@ -57,6 +58,7 @@ export const listAllOrdersQuery = Joi.object<ListOrdersQuery>({
   limit: Joi.number().integer().min(1).max(100).default(20),
   status: Joi.string().valid(...orderStatuses),
   paymentStatus: Joi.string().valid('unpaid', 'submitted', 'paid', 'refunded'),
+  search: Joi.string().trim().min(1).max(255),
 });
 
 export const listOrdersQuery = Joi.object<ListOrdersQuery>({
