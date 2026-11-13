@@ -14,6 +14,7 @@ export const permissions = {
   'categories.manage': 'Create, edit, and delete categories',
   'blogs.manage': 'Write blogs and read drafts',
   'banners.manage': 'Manage the storefront banners',
+  'promotions.manage': 'Manage sales and flash sales',
   'assets.manage': 'List, upload, and delete files',
   'payment_methods.manage': 'Manage payment methods and see account numbers',
   'reports.operations': 'Order status and low stock reports',

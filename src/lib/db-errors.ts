@@ -3,6 +3,7 @@ import { DatabaseError } from 'pg';
 
 export const UNIQUE_VIOLATION = '23505';
 export const FOREIGN_KEY_VIOLATION = '23503';
+export const CHECK_VIOLATION = '23514';
 
 /**
  * Query errors carry the query's values, which can include password hashes and personal data,

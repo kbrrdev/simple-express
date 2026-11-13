@@ -173,6 +173,7 @@ export const reportSchemas = {
       'netCollectedCents',
       'taxCents',
       'shippingCents',
+      'discountCents',
       'newCustomers',
       'taxByRate',
     ],
@@ -189,6 +190,7 @@ export const reportSchemas = {
       netCollectedCents: cents('Collected minus refunded'),
       taxCents: cents('Tax on gross sales'),
       shippingCents: cents('Shipping on gross sales'),
+      discountCents: cents('Taken off list prices by sales, on gross sales'),
       newCustomers: { type: 'integer', description: 'Customer accounts created in the range' },
       taxByRate: {
         type: 'array',

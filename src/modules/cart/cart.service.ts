@@ -3,12 +3,14 @@ import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { products, productVariants } from '../products/product.schema';
 import { findImages } from '../products/product.service';
+import { findSalePrices } from '../sales/sale.service';
 import { cartItems } from './cart.schema';
 import { MAX_ITEM_QUANTITY, type CartItemInput } from './cart.validation';
 
 const itemFields = {
   variantId: productVariants.id,
   productId: products.id,
+  categoryId: products.categoryId,
   productName: products.name,
   option1Name: products.option1Name,
   option1Value: productVariants.option1Value,
@@ -166,20 +168,33 @@ function quantityLimit({ stock }: VariantRow) {
 }
 
 async function toCart(rows: (VariantRow & { quantity: number })[]) {
-  const images = await findImages(rows.map((row) => row.productId));
+  const [images, salePrices] = await Promise.all([
+    findImages(rows.map((row) => row.productId)),
+    findSalePrices(
+      db,
+      rows.map((row) => ({ ...row, priceCents: row.unitPriceCents })),
+    ),
+  ]);
 
-  const items = rows.map(({ variantActive, productActive, variantAssetId, ...row }) => {
-    const productImages = images.filter((image) => image.productId === row.productId);
-    const image =
-      productImages.find((candidate) => candidate.assetId === variantAssetId) ?? productImages[0];
+  const items = rows.map(
+    ({ variantActive, productActive, variantAssetId, categoryId: _categoryId, ...row }) => {
+      const productImages = images.filter((image) => image.productId === row.productId);
+      const image =
+        productImages.find((candidate) => candidate.assetId === variantAssetId) ?? productImages[0];
+      const sale = salePrices.get(row.variantId);
+      const unitPriceCents = sale?.priceCents ?? row.unitPriceCents;
 
-    return {
-      ...row,
-      imageUrl: image?.url ?? null,
-      lineTotalCents: row.unitPriceCents * row.quantity,
-      available: variantActive && productActive,
-    };
-  });
+      return {
+        ...row,
+        unitPriceCents,
+        compareAtPriceCents: sale?.compareAtPriceCents ?? null,
+        saleEndsAt: sale?.saleEndsAt ?? null,
+        imageUrl: image?.url ?? null,
+        lineTotalCents: unitPriceCents * row.quantity,
+        available: variantActive && productActive,
+      };
+    },
+  );
 
   const subtotalCents = items
     .filter((item) => item.available)

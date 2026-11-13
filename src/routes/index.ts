@@ -18,6 +18,7 @@ import { paymentMethodRoutes } from '../modules/payment-methods/payment-method.r
 import { productRoutes } from '../modules/products/product.routes';
 import { reportRoutes } from '../modules/reports/report.routes';
 import { roleRoutes } from '../modules/roles/role.routes';
+import { saleRoutes } from '../modules/sales/sale.routes';
 import { userRoutes } from '../modules/users/user.routes';
 
 const apiRoutes = Router();
@@ -36,6 +37,7 @@ apiRoutes.use('/payment-methods', paymentMethodRoutes);
 apiRoutes.use('/products', productRoutes);
 apiRoutes.use('/reports', reportRoutes);
 apiRoutes.use('/roles', roleRoutes);
+apiRoutes.use('/sales', saleRoutes);
 apiRoutes.use('/users', userRoutes);
 
 export const routes = Router();

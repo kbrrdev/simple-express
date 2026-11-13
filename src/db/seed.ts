@@ -22,6 +22,7 @@ import {
   updateOrderStatus,
 } from '../modules/orders/order.service';
 import { createMethod } from '../modules/payment-methods/payment-method.service';
+import { createSale } from '../modules/sales/sale.service';
 import {
   addImage,
   addVariant,
@@ -210,6 +211,22 @@ async function main() {
     stock: 4,
   });
   await deactivateVariant(dress.id, largeDress.id);
+
+  // A regular sale, and a flash sale with a stock cap that ends in two days.
+  await createSale({
+    name: 'Accessories Week',
+    discountType: 'percent',
+    discountValue: 15,
+    categoryIds: [accessories.id],
+  });
+  await createSale({
+    name: 'Runner Flash Sale',
+    discountType: 'fixed',
+    discountValue: 50000,
+    endsAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    stockCap: 20,
+    productIds: [runner.id],
+  });
 
   const gcash = await createMethod({
     providerName: 'GCash',

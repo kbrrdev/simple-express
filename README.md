@@ -151,6 +151,7 @@ src/
     ├── products/
     ├── reports/
     ├── roles/
+    ├── sales/
     └── users/
 
 docs/
@@ -216,7 +217,7 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
 | Email                  | Role        | Password           |
 | ---------------------- | ----------- | ------------------ |
@@ -329,6 +330,7 @@ New users are customers, with no role. Staff accounts get a role, and each role 
 | `categories.manage`      | Create, edit, and delete categories                                       |
 | `blogs.manage`           | Write blogs and read drafts                                               |
 | `banners.manage`         | Manage the storefront banners                                             |
+| `promotions.manage`      | Manage sales and flash sales                                              |
 | `assets.manage`          | List, upload, and delete files                                            |
 | `payment_methods.manage` | Manage payment methods and see account numbers                            |
 | `reports.operations`     | Order status and low stock reports                                        |
@@ -401,6 +403,25 @@ A storefront shows the mobile image on phones with a `<picture>` element, so pho
   <img src="{imageUrl}" alt="{altText}" />
 </picture>
 ```
+
+## Sales
+
+A sale takes a percentage or a fixed amount off chosen products, or off whole categories and their subcategories. A flash sale is a sale with short dates, and optionally a stock cap. Users with `promotions.manage` manage them, and the migration grants it to the Admin role.
+
+| Endpoint                | Description                                             |
+| ----------------------- | ------------------------------------------------------- |
+| `GET /api/sales`        | Every sale, with its `productIds` and `categoryIds`     |
+| `GET /api/sales/:id`    | One sale                                                |
+| `POST /api/sales`       | Add a sale                                              |
+| `PATCH /api/sales/:id`  | Update a sale. Sent ID lists replace the existing ones. |
+| `DELETE /api/sales/:id` | Delete a sale. Past orders keep their prices.           |
+
+- `discountType` is `percent`, with `discountValue` from 1 to 90, or `fixed`, with `discountValue` in cents. Prices never go below zero.
+- `startsAt` and `endsAt` are optional. A sale needs at least one product or category.
+- When a product is in more than one sale, shoppers get the lowest price.
+- `stockCap` limits how many units sell at the sale price, across all its products. Once they are sold, prices go back to normal, and cancelled orders give their units back. A cart only gets the sale price when all its units of that sale fit under the cap.
+
+Shoppers see sales through the prices they already use. Public product routes, the cart, and order previews return the sale price as `priceCents` or `unitPriceCents`, with `compareAtPriceCents` for showing the old price struck through, and `saleEndsAt` for a countdown. Admin product routes return the list price, which is what admins edit. Order items keep `listPriceCents`, the price before any sale.
 
 ## Products
 
@@ -594,19 +615,20 @@ To use a courier's rates, change `calculateShipping` in `order.service.ts`, whic
 
 These endpoints feed an admin dashboard, one part each. `summary`, `sales`, and `top-products` need `reports.sales`, and `order-status` and `low-stock` need `reports.operations`.
 
-| Endpoint                        | Dashboard part   | Returns                                                                     |
-| ------------------------------- | ---------------- | --------------------------------------------------------------------------- |
-| `GET /api/reports/summary`      | Headline numbers | Orders, gross sales, collected, refunds, tax, shipping, average order value |
-| `GET /api/reports/sales`        | Sales chart      | Orders, gross sales, and collected per `day`, `week`, or `month`            |
-| `GET /api/reports/top-products` | Best sellers     | Products by `quantity` or `revenue`                                         |
-| `GET /api/reports/order-status` | Needs attention  | Orders per status, and payments to confirm, orders to confirm, and to ship  |
-| `GET /api/reports/low-stock`    | Low stock        | Variants on sale with stock at or below `threshold`, 5 by default           |
+| Endpoint                        | Dashboard part   | Returns                                                                                |
+| ------------------------------- | ---------------- | -------------------------------------------------------------------------------------- |
+| `GET /api/reports/summary`      | Headline numbers | Orders, gross sales, collected, refunds, tax, shipping, discounts, average order value |
+| `GET /api/reports/sales`        | Sales chart      | Orders, gross sales, and collected per `day`, `week`, or `month`                       |
+| `GET /api/reports/top-products` | Best sellers     | Products by `quantity` or `revenue`                                                    |
+| `GET /api/reports/order-status` | Needs attention  | Orders per status, and payments to confirm, orders to confirm, and to ship             |
+| `GET /api/reports/low-stock`    | Low stock        | Variants on sale with stock at or below `threshold`, 5 by default                      |
 
 Ranges take `from` and `to` as dates, such as `?from=2026-03-01&to=2026-03-31`. Both days are included, days follow Manila time, and the default is the last 30 days. `order-status` and `low-stock` show the store as it is now.
 
 - **Gross sales** are orders placed in the range, apart from cancelled ones.
 - **Collected** is payments received in the range, counted on the day they arrived. COD orders are collected on delivery.
 - **Refunded** is payments received in the range that were later refunded.
+- **Discounts** is what sales took off list prices, on gross sales.
 
 Reports use the amounts saved on each order, so changing the tax rate never changes past figures. If the rate changes during a range, `taxByRate` in the summary lists each rate separately.
 
