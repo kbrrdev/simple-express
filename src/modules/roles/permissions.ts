@@ -13,6 +13,7 @@ export const permissions = {
   'inventory.manage': 'Change variant stock only',
   'categories.manage': 'Create, edit, and delete categories',
   'blogs.manage': 'Write blogs and read drafts',
+  'banners.manage': 'Manage the storefront banners',
   'assets.manage': 'List, upload, and delete files',
   'payment_methods.manage': 'Manage payment methods and see account numbers',
   'reports.operations': 'Order status and low stock reports',

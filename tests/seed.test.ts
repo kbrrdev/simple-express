@@ -5,6 +5,7 @@ import { db, pool } from '../src/db';
 import {
   addresses,
   assets,
+  banners,
   blogs,
   cartItems,
   categories,
@@ -64,6 +65,7 @@ describe('seed', () => {
       productImages,
       paymentMethods,
       blogs,
+      banners,
       cartItems,
       orders,
       orderItems,

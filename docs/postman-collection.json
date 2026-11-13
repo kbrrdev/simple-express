@@ -619,6 +619,160 @@
       ]
     },
     {
+      "name": "Banners",
+      "item": [
+        {
+          "name": "List the banners the storefront shows",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Returns active banners whose dates include now, in position order. Show mobileImageUrl on phones when it is set, and imageUrl otherwise.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Add a banner (needs banners.manage)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.collectionVariables.set('bannerId', data.id);",
+                  "  if (data.variants) pm.collectionVariables.set('variantId', data.variants[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Upload the images through /api/assets first, then send their ids. A store can have at most 15 banners, counting inactive ones.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetId\": \"{{assetId}}\",\n  \"altText\": \"Holiday sale, up to 30% off\",\n  \"title\": \"Holiday Sale\",\n  \"subtitle\": \"Up to 30% off\",\n  \"linkUrl\": \"/categories\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List every banner, including inactive and scheduled ones (needs banners.manage)",
+          "request": {
+            "method": "GET",
+            "description": "meta.maxBanners is the most a store can have, counting inactive ones, so the admin app can warn before the limit.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners",
+                "admin"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Update a banner (needs banners.manage)",
+          "request": {
+            "method": "PATCH",
+            "description": "Set mobileAssetId to null to use the default image on phones.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{bannerId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"altText\": \"Holiday sale, up to 30% off\",\n  \"title\": \"Holiday Sale\",\n  \"subtitle\": \"Up to 30% off\",\n  \"linkUrl\": \"/categories\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a banner (needs banners.manage)",
+          "request": {
+            "method": "DELETE",
+            "description": "Its images stay in /api/assets.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{bannerId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Categories",
       "item": [
         {

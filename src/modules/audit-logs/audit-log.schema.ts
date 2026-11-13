@@ -3,6 +3,7 @@ import { users } from '../auth/auth.schema';
 
 export const auditEntityTypes = [
   'asset',
+  'banner',
   'blog',
   'category',
   'order',

@@ -6,6 +6,7 @@ import {
 import { assetPaths, assetSchemas } from '../modules/assets/asset.openapi';
 import { auditLogPaths, auditLogSchemas } from '../modules/audit-logs/audit-log.openapi';
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi';
+import { bannerParameters, bannerPaths, bannerSchemas } from '../modules/banners/banner.openapi';
 import { blogParameters, blogPaths, blogSchemas } from '../modules/blogs/blog.openapi';
 import { cartParameters, cartPaths, cartSchemas } from '../modules/cart/cart.openapi';
 import {
@@ -44,6 +45,7 @@ export const openApiDocument = {
     { name: 'Health' },
     { name: 'Auth' },
     { name: 'Blogs' },
+    { name: 'Banners' },
     { name: 'Categories' },
     { name: 'Products' },
     { name: 'Cart' },
@@ -80,6 +82,7 @@ export const openApiDocument = {
     },
     ...authPaths,
     ...blogPaths,
+    ...bannerPaths,
     ...categoryPaths,
     ...productPaths,
     ...cartPaths,
@@ -98,6 +101,7 @@ export const openApiDocument = {
     },
     parameters: {
       ...blogParameters,
+      ...bannerParameters,
       ...categoryParameters,
       ...productParameters,
       ...cartParameters,
@@ -123,6 +127,7 @@ export const openApiDocument = {
     schemas: {
       ...authSchemas,
       ...blogSchemas,
+      ...bannerSchemas,
       ...categorySchemas,
       ...productSchemas,
       ...cartSchemas,

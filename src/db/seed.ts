@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { createAddress } from '../modules/addresses/address.service';
 import { createAsset } from '../modules/assets/asset.service';
 import { register } from '../modules/auth/auth.service';
+import { createBanner } from '../modules/banners/banner.service';
 import { createBlog } from '../modules/blogs/blog.service';
 import { addItem } from '../modules/cart/cart.service';
 import type { CartItemInput } from '../modules/cart/cart.validation';
@@ -245,6 +246,21 @@ async function main() {
     title: 'Holiday sale plans',
     content: 'Draft: list the products and discounts for the holiday sale.',
     author: 'Store Team',
+  });
+
+  await createBanner({
+    assetId: await newImage(),
+    mobileAssetId: await newImage(),
+    altText: 'New arrivals for the season',
+    title: 'New Arrivals',
+    subtitle: 'Fresh styles, just in',
+    linkUrl: '/products',
+  });
+  await createBanner({
+    assetId: await newImage(),
+    altText: 'Free shipping on every order this week',
+    title: 'Free Shipping',
+    position: 1,
   });
 
   const basics = [
