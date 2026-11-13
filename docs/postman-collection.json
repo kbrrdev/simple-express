@@ -1827,6 +1827,160 @@
       ]
     },
     {
+      "name": "Coupons",
+      "item": [
+        {
+          "name": "List every coupon with its usage (needs promotions.manage)",
+          "request": {
+            "method": "GET",
+            "description": "Shoppers use coupons through couponCode on the order preview and checkout, so these routes are for admins only.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Add a coupon (needs promotions.manage)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const { data } = pm.response.json();",
+                  "  pm.collectionVariables.set('couponId', data.id);",
+                  "  if (data.variants) pm.collectionVariables.set('variantId', data.variants[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"WELCOME10\",\n  \"discountType\": \"percent\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get a coupon (needs promotions.manage)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{couponId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update a coupon (needs promotions.manage)",
+          "request": {
+            "method": "PATCH",
+            "description": "Orders already placed keep their discount.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{couponId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"WELCOME10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a coupon (needs promotions.manage)",
+          "request": {
+            "method": "DELETE",
+            "description": "Fails with 409 once orders use it. Set isActive to false instead.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{couponId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Payment Methods",
       "item": [
         {
@@ -2002,7 +2156,7 @@
             "auth": {
               "type": "noauth"
             },
-            "description": "Shows the final total before checkout. Send the returned `totalCents` to checkout as `expectedTotalCents`.",
+            "description": "Shows the final total before checkout. Send the returned `totalCents` to checkout as `expectedTotalCents`. A coupon that cannot be used does not fail the preview: it is left out, and `couponError` says why. Send a bearer token or `email`, so that once-per-customer coupons can be checked.",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/orders/preview",
@@ -2019,7 +2173,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 2\n    }\n  ]\n}",
+              "raw": "{\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"couponCode\": \"WELCOME10\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2098,7 +2252,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"addressId\": \"{{addressId}}\",\n  \"paymentMethod\": \"cod\",\n  \"expectedTotalCents\": \"{{expectedTotalCents}}\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}",
+              "raw": "{\n  \"addressId\": \"{{addressId}}\",\n  \"paymentMethod\": \"cod\",\n  \"expectedTotalCents\": \"{{expectedTotalCents}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"couponCode\": \"WELCOME10\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2144,7 +2298,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"guest@example.com\",\n  \"address\": {\n    \"recipientName\": \"Juan Dela Cruz\",\n    \"phone\": \"09171234567\",\n    \"line1\": \"123 Rizal Street\",\n    \"line2\": \"Sunrise Village\",\n    \"barangay\": \"San Antonio\",\n    \"city\": \"Pasig\",\n    \"province\": \"Metro Manila\",\n    \"postalCode\": \"1605\"\n  },\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"paymentMethod\": \"{{paymentMethodId}}\",\n  \"expectedTotalCents\": \"{{expectedTotalCents}}\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}",
+              "raw": "{\n  \"email\": \"guest@example.com\",\n  \"address\": {\n    \"recipientName\": \"Juan Dela Cruz\",\n    \"phone\": \"09171234567\",\n    \"line1\": \"123 Rizal Street\",\n    \"line2\": \"Sunrise Village\",\n    \"barangay\": \"San Antonio\",\n    \"city\": \"Pasig\",\n    \"province\": \"Metro Manila\",\n    \"postalCode\": \"1605\"\n  },\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"paymentMethod\": \"{{paymentMethodId}}\",\n  \"expectedTotalCents\": \"{{expectedTotalCents}}\",\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"couponCode\": \"WELCOME10\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

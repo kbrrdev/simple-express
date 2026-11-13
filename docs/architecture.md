@@ -106,6 +106,7 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/blogs`           | Blogs module                  |
 | `/api/cart`            | Cart module                   |
 | `/api/categories`      | Categories module             |
+| `/api/coupons`         | Coupons module                |
 | `/api/orders`          | Orders module                 |
 | `/api/payment-methods` | Payment methods module        |
 | `/api/products`        | Products module               |
@@ -183,6 +184,17 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Changing `parent_id` moves the whole subtree. Moves into the category's own subtree, or past three levels, are rejected.
 - Changes take an advisory lock and run one at a time, so that two moves cannot form a loop. Stores have few categories, so they are read whole for these checks and for `/api/categories/tree`.
 - A category cannot be deleted while it has subcategories or products.
+
+## Coupons
+
+- `applyCoupon` in `coupon.service.ts` is the only place that checks a coupon and works out its discount. The preview and checkout both use it.
+- A coupon covers the whole order. Items on sale are left out, for its minimum and its discount, unless `allow_sale_items` is on.
+- `spread` splits the discount across the eligible lines in proportion to their totals, and gives rounding leftovers to the largest lines. Each line is taxed after its share, so tax and refunds stay right.
+- Checkout locks the coupon row and counts `coupon_redemptions` again, so parallel orders cannot pass `usage_limit` or `per_customer_limit`. Orders using the same coupon run in turn.
+- Guests are counted by email, ignoring case. A coupon can be closed to guests with `allow_guests`.
+- The preview reports a coupon that cannot be used in `couponError` instead of failing. `optionalAuth` lets it read the login, and a bad token is still a `401`.
+- Cancelling an order deletes its redemption. A redemption's foreign key stops a used coupon being deleted.
+- Orders copy `coupon_code` and `discount_cents`, and each item its share, so later changes to the coupon never alter them.
 
 ## Products
 

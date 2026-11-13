@@ -2,6 +2,7 @@ import Joi from 'joi';
 import type { AddressBody } from '../addresses/address.validation';
 import { createAddressBody } from '../addresses/address.validation';
 import { cartItemsList, type CartItemInput } from '../cart/cart.validation';
+import { couponCode } from '../coupons/coupon.validation';
 import type { Order, OrderStatus } from './order.schema';
 
 /** Guests pay nothing to place an order, so this limits how much stock each one can hold. */
@@ -15,11 +16,18 @@ export interface ListOrdersQuery {
   search?: string;
 }
 
+export interface PreviewOrderBody {
+  items: CartItemInput[];
+  couponCode?: string;
+  email?: string;
+}
+
 export interface CreateOrderBody {
   addressId: string;
   paymentMethod: string;
   expectedTotalCents: number;
   idempotencyKey: string;
+  couponCode?: string;
 }
 
 export interface GuestOrderBody {
@@ -29,6 +37,7 @@ export interface GuestOrderBody {
   paymentMethod: string;
   expectedTotalCents: number;
   idempotencyKey: string;
+  couponCode?: string;
 }
 
 export interface SubmitPaymentBody {
@@ -67,15 +76,25 @@ export const listOrdersQuery = Joi.object<ListOrdersQuery>({
   status: Joi.string().valid(...orderStatuses),
 });
 
+const email = Joi.string().trim().lowercase().email({ tlds: false }).max(255);
+
+// The email lets a guest's preview check a once-per-customer coupon.
+export const previewOrderBody = Joi.object<PreviewOrderBody>({
+  items: cartItemsList.required(),
+  couponCode,
+  email,
+});
+
 export const createOrderBody = Joi.object<CreateOrderBody>({
   addressId: Joi.string().uuid().required(),
   paymentMethod: Joi.alternatives(Joi.string().valid('cod'), Joi.string().uuid()).required(),
   expectedTotalCents: Joi.number().integer().min(0).required(),
   idempotencyKey: Joi.string().uuid().required(),
+  couponCode,
 });
 
 export const guestOrderBody = Joi.object<GuestOrderBody>({
-  email: Joi.string().trim().lowercase().email({ tlds: false }).max(255).required(),
+  email: email.required(),
   address: createAddressBody.required(),
   items: cartItemsList
     .min(1)
@@ -91,6 +110,7 @@ export const guestOrderBody = Joi.object<GuestOrderBody>({
   paymentMethod: Joi.string().uuid().required(),
   expectedTotalCents: Joi.number().integer().min(0).required(),
   idempotencyKey: Joi.string().uuid().required(),
+  couponCode,
 });
 
 export const guestTokenParams = Joi.object({

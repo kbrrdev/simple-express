@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
-import type { CartItemsBody } from '../cart/cart.validation';
 import * as orderService from './order.service';
 import type {
   CreateOrderBody,
   GuestOrderBody,
   ListOrdersQuery,
+  PreviewOrderBody,
   SubmitPaymentBody,
   UpdateOrderStatusBody,
 } from './order.validation';
@@ -12,8 +12,12 @@ import type {
 type IdParams = { id: string };
 type TokenParams = { token: string };
 
-export async function preview(req: Request<object, object, CartItemsBody>, res: Response) {
-  res.json({ data: await orderService.previewOrder(req.body.items) });
+export async function preview(req: Request<object, object, PreviewOrderBody>, res: Response) {
+  const { items, couponCode, email } = req.body;
+  const userId: string | undefined = res.locals.auth?.userId;
+  const customer = userId ? { userId } : email ? { guestEmail: email } : null;
+
+  res.json({ data: await orderService.previewOrder(items, { couponCode, customer }) });
 }
 
 export async function create(req: Request<object, object, CreateOrderBody>, res: Response) {

@@ -87,13 +87,14 @@ export async function getSummary(query: DateRangeQuery) {
         grossSalesCents: sumOf(orders.totalCents, notCancelled),
         taxCents: sumOf(orders.taxCents, notCancelled),
         shippingCents: sumOf(orders.shippingCents, notCancelled),
+        couponDiscountCents: sumOf(orders.discountCents, notCancelled),
       })
       .from(orders)
       .where(inRange(orders.createdAt, range)),
     db
       .select({
         itemsSold: sumOf(orderItems.quantity),
-        discountCents: sumOf(
+        saleDiscountCents: sumOf(
           sql`(${orderItems.listPriceCents} - ${orderItems.unitPriceCents}) * ${orderItems.quantity}`,
         ),
       })
@@ -132,6 +133,8 @@ export async function getSummary(query: DateRangeQuery) {
   const grossSalesCents = totals?.grossSalesCents ?? 0;
   const sales = ordersPlaced - cancelledOrders;
   const collectedCents = collected[0]?.collectedCents ?? 0;
+  const saleDiscountCents = items[0]?.saleDiscountCents ?? 0;
+  const couponDiscountCents = totals?.couponDiscountCents ?? 0;
   const refundedCents = collected[0]?.refundedCents ?? 0;
 
   return {
@@ -146,7 +149,9 @@ export async function getSummary(query: DateRangeQuery) {
     netCollectedCents: collectedCents - refundedCents,
     taxCents: totals?.taxCents ?? 0,
     shippingCents: totals?.shippingCents ?? 0,
-    discountCents: items[0]?.discountCents ?? 0,
+    discountCents: saleDiscountCents + couponDiscountCents,
+    saleDiscountCents,
+    couponDiscountCents,
     newCustomers: customers[0]?.newCustomers ?? 0,
     taxByRate: taxByRate.map((row) => ({
       ratePercent: row.taxRateBasisPoints / 100,

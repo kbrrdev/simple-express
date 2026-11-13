@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { logRateLimit } from '../../middleware/rate-limit';
-import { requireAuth, requirePermission } from '../../middleware/require-auth';
+import { optionalAuth, requireAuth, requirePermission } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
-import { cartItemsBody } from '../cart/cart.validation';
 import * as controller from './order.controller';
 import {
   createOrderBody,
@@ -12,6 +11,7 @@ import {
   listAllOrdersQuery,
   listOrdersQuery,
   orderParams,
+  previewOrderBody,
   submitPaymentBody,
   updateOrderStatusBody,
 } from './order.validation';
@@ -38,7 +38,7 @@ export const guestPaymentLimiter = rateLimit({
 
 export const orderRoutes = Router();
 
-orderRoutes.post('/preview', validate('body', cartItemsBody), controller.preview);
+orderRoutes.post('/preview', optionalAuth, validate('body', previewOrderBody), controller.preview);
 orderRoutes.post('/', requireAuth, validate('body', createOrderBody), controller.create);
 orderRoutes.get('/', requireAuth, validate('query', listOrdersQuery), controller.list);
 
