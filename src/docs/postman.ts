@@ -40,6 +40,7 @@ const document = openApiDocument as unknown as {
 const bodyVariables: Record<string, string> = {
   addressId: '{{addressId}}',
   assetId: '{{assetId}}',
+  mobileAssetId: '{{assetId}}',
   categoryId: '{{categoryId}}',
   coverAssetId: '{{assetId}}',
   expectedTotalCents: '{{expectedTotalCents}}',
@@ -51,6 +52,7 @@ const bodyVariables: Record<string, string> = {
 const idVariablesByTag: Record<string, string> = {
   Addresses: 'addressId',
   Assets: 'assetId',
+  Banners: 'bannerId',
   Blogs: 'blogId',
   Categories: 'categoryId',
   Orders: 'orderId',
@@ -61,6 +63,7 @@ const idVariablesByTag: Record<string, string> = {
 const createdIdVariables: Record<string, string> = {
   '/api/addresses': 'addressId',
   '/api/assets': 'assetId',
+  '/api/banners': 'bannerId',
   '/api/blogs': 'blogId',
   '/api/categories': 'categoryId',
   '/api/orders': 'orderId',

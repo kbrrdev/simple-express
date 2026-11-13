@@ -142,6 +142,7 @@ src/
     ├── assets/
     ├── audit-logs/
     ├── auth/
+    ├── banners/
     ├── blogs/
     ├── cart/
     ├── categories/
@@ -215,7 +216,7 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
 | Email                  | Role        | Password           |
 | ---------------------- | ----------- | ------------------ |
@@ -327,6 +328,7 @@ New users are customers, with no role. Staff accounts get a role, and each role 
 | `inventory.manage`       | Change variant stock only                                                 |
 | `categories.manage`      | Create, edit, and delete categories                                       |
 | `blogs.manage`           | Write blogs and read drafts                                               |
+| `banners.manage`         | Manage the storefront banners                                             |
 | `assets.manage`          | List, upload, and delete files                                            |
 | `payment_methods.manage` | Manage payment methods and see account numbers                            |
 | `reports.operations`     | Order status and low stock reports                                        |
@@ -372,6 +374,33 @@ In the production container, run `docker compose exec api node dist/db/set-role.
 ## Blogs
 
 Published blogs are public to read, and drafts are hidden from the public, including by direct link. Users with `blogs.manage` can create, update, and delete blogs, and read drafts through `GET /api/blogs/admin` and `GET /api/blogs/admin/:id`.
+
+## Banners
+
+Banners are the promotional images at the top of the storefront. Users with `banners.manage` manage them, and the migration grants it to the Admin role.
+
+| Endpoint                  | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `GET /api/banners`        | Public. Active banners within their dates, in position order |
+| `GET /api/banners/admin`  | Every banner, including inactive and scheduled ones          |
+| `POST /api/banners`       | Add a banner                                                 |
+| `PATCH /api/banners/:id`  | Update a banner                                              |
+| `DELETE /api/banners/:id` | Delete a banner, keeping its images                          |
+
+- `assetId` is the default image, and is required. `mobileAssetId` is optional, and is shown on phones instead. Set it to `null` to go back to the default image.
+- One `altText` describes both images.
+- `linkUrl` is a storefront path starting with `/`, or an `https://` link.
+- `startsAt` and `endsAt` are optional, so a sale banner can turn itself on and off. `endsAt` must be after `startsAt`.
+- A store can have at most 15 banners, counting inactive and expired ones. The admin list returns the limit as `meta.maxBanners`, so the admin app can warn before it is reached.
+
+A storefront shows the mobile image on phones with a `<picture>` element, so phones only download the image they show:
+
+```html
+<picture>
+  <source media="(max-width: 767px)" srcset="{mobileImageUrl}" />
+  <img src="{imageUrl}" alt="{altText}" />
+</picture>
+```
 
 ## Products
 
@@ -658,6 +687,7 @@ Attaching an image takes two steps:
 | `DELETE /api/products/:id/images/:imageId`                      | Remove an image from a product, keeping the file            |
 | `PATCH /api/products/:id/variants/:variantId`                   | Set `assetId` to give a variant one of the product's images |
 | `POST /api/blogs` or `PATCH /api/blogs/:id`                     | Set `coverAssetId` to give a blog a cover                   |
+| `POST /api/banners` or `PATCH /api/banners/:id`                 | Set `assetId`, and optionally `mobileAssetId`, for a banner |
 | `POST /api/categories` or `PATCH /api/categories/:id`           | Set `imageAssetId` to give a category an image              |
 | `POST /api/payment-methods` or `PATCH /api/payment-methods/:id` | Set `qrAssetId` to give a method a QR code                  |
 

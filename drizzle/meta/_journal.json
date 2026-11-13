@@ -148,6 +148,13 @@
       "when": 1794414962558,
       "tag": "0020_drop_user_role_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794554455243,
+      "tag": "0021_banners",
+      "breakpoints": true
     }
   ]
 }

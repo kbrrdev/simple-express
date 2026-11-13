@@ -102,6 +102,7 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/assets`          | Assets module                 |
 | `/api/audit-logs`      | Audit logs module             |
 | `/api/auth`            | Auth module                   |
+| `/api/banners`         | Banners module                |
 | `/api/blogs`           | Blogs module                  |
 | `/api/cart`            | Cart module                   |
 | `/api/categories`      | Categories module             |
@@ -156,6 +157,14 @@ Central route registration. Module routes are mounted under `/api`.
 ## Blogs
 
 Published blogs are public to read, and drafts are hidden, including by direct link. Writing blogs and reading drafts need `blogs.manage`.
+
+## Banners
+
+- Banners are the storefront's promotional images. The public list returns active banners whose dates include now, and admins see every banner.
+- `asset_id` is the default image. `mobile_asset_id` is optional, and replaces it on phones. Both reference `assets`.
+- Links must be a path starting with `/` or an `https://` link, so a banner cannot run a `javascript:` URL.
+- A store has at most 15 banners, counting inactive ones. Creates take an advisory lock, so parallel requests cannot pass the limit. The admin list returns the limit as `meta.maxBanners`.
+- Banners are deleted outright, as nothing else references them. `banners.manage` guards every change.
 
 ## Categories
 
@@ -241,7 +250,7 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - `env.ts` rejects a partial S3 setup at startup, so that uploads never fall back to disk by accident.
 - A product has up to 10 rows in `product_images`, which hold the alt text and position. A variant's `asset_id` has a composite foreign key to `product_images`, which keeps the image on the same product and blocks removing it while in use.
 - Cart and order items use the variant's image, then the product's first image. Order items also block deleting the asset.
-- Blogs have an optional cover image, and categories an optional image, each referencing `assets`.
+- Blogs have an optional cover image, and categories an optional image, each referencing `assets`. Banners have a default image and an optional mobile image.
 
 ## Logging
 
