@@ -26,6 +26,11 @@ import {
   productPaths,
   productSchemas,
 } from '../modules/products/product.openapi';
+import {
+  promotionParameters,
+  promotionPaths,
+  promotionSchemas,
+} from '../modules/promotions/promotion.openapi';
 import { reportParameters, reportPaths, reportSchemas } from '../modules/reports/report.openapi';
 import { roleParameters, rolePaths, roleSchemas } from '../modules/roles/role.openapi';
 import { saleParameters, salePaths, saleSchemas } from '../modules/sales/sale.openapi';
@@ -53,6 +58,7 @@ export const openApiDocument = {
     { name: 'Cart' },
     { name: 'Sales' },
     { name: 'Coupons' },
+    { name: 'Promotions' },
     { name: 'Payment Methods' },
     { name: 'Orders' },
     { name: 'Addresses' },
@@ -92,6 +98,7 @@ export const openApiDocument = {
     ...cartPaths,
     ...salePaths,
     ...couponPaths,
+    ...promotionPaths,
     ...paymentMethodPaths,
     ...orderPaths,
     ...addressPaths,
@@ -113,6 +120,7 @@ export const openApiDocument = {
       ...cartParameters,
       ...saleParameters,
       ...couponParameters,
+      ...promotionParameters,
       ...orderParameters,
       ...paymentMethodParameters,
       ...addressParameters,
@@ -141,6 +149,7 @@ export const openApiDocument = {
       ...cartSchemas,
       ...saleSchemas,
       ...couponSchemas,
+      ...promotionSchemas,
       ...orderSchemas,
       ...paymentMethodSchemas,
       ...addressSchemas,

@@ -59,6 +59,7 @@ const idVariablesByTag: Record<string, string> = {
   Orders: 'orderId',
   'Payment Methods': 'paymentMethodId',
   Products: 'productId',
+  Promotions: 'promotionId',
   Sales: 'saleId',
 };
 
@@ -74,6 +75,7 @@ const createdIdVariables: Record<string, string> = {
   '/api/products': 'productId',
   '/api/products/{id}/images': 'imageId',
   '/api/products/{id}/variants': 'variantId',
+  '/api/promotions': 'promotionId',
   '/api/sales': 'saleId',
 };
 

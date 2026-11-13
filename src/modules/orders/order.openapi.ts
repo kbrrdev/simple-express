@@ -333,6 +333,11 @@ const totals = {
     description: 'Items at the prices paid, before any coupon',
     example: 112000,
   },
+  promotionDiscountCents: {
+    type: 'integer',
+    description: 'Taken off by buy X get Y and bundle promotions',
+    example: 0,
+  },
   discountCents: { type: 'integer', description: 'Taken off by a coupon', example: 0 },
   shippingCents: { type: 'integer', example: 10000 },
   vatableCents: {
@@ -357,6 +362,7 @@ const orderRequired = [
   'payment',
   'couponCode',
   'subtotalCents',
+  'promotionDiscountCents',
   'discountCents',
   'shippingCents',
   'vatableCents',
@@ -444,6 +450,8 @@ export const orderSchemas = {
     required: [
       'items',
       'subtotalCents',
+      'promotions',
+      'promotionDiscountCents',
       'discountCents',
       'coupon',
       'couponError',
@@ -456,6 +464,19 @@ export const orderSchemas = {
     ],
     properties: {
       items: { type: 'array', items: { $ref: '#/components/schemas/CartItem' } },
+      promotions: {
+        type: 'array',
+        description: 'The promotions applied, with what each took off',
+        items: {
+          type: 'object',
+          required: ['id', 'name', 'discountCents'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', example: 'Buy 2 tees, get 1 free' },
+            discountCents: { type: 'integer', example: 1999 },
+          },
+        },
+      },
       coupon: {
         type: ['object', 'null'],
         description:
@@ -505,6 +526,8 @@ export const orderSchemas = {
       'option2Value',
       'unitPriceCents',
       'listPriceCents',
+      'promotionDiscountCents',
+      'promotionName',
       'discountCents',
       'quantity',
       'taxCents',
@@ -525,12 +548,17 @@ export const orderSchemas = {
         description: 'The price before any sale. Equal to unitPriceCents when nothing was on sale.',
         example: 70000,
       },
+      promotionDiscountCents: {
+        type: 'integer',
+        description: "The promotion's share of this line",
+      },
+      promotionName: { ...nullableString, example: 'Buy 2 tees, get 1 free' },
       discountCents: { type: 'integer', description: "The coupon's share of this line" },
       quantity: { type: 'integer', example: 2 },
       taxCents: { type: 'integer', example: 12000 },
       lineTotalCents: {
         type: 'integer',
-        description: 'unitPriceCents times quantity, less discountCents',
+        description: 'unitPriceCents times quantity, less promotionDiscountCents and discountCents',
         example: 112000,
       },
       imageUrl: { type: ['string', 'null'], format: 'uri' },

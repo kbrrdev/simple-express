@@ -129,7 +129,7 @@ function bestPrice(priceCents: number, candidates: Sale[]): SalePrice {
 }
 
 /** Each category with its parents, as a sale on a category covers its subcategories. */
-async function categoryAncestors(database: Database, needed: boolean) {
+export async function categoryAncestors(database: Database, needed: boolean) {
   // Stores have few categories, so they are read whole, as the category module does.
   const rows = needed
     ? await database.select({ id: categories.id, parentId: categories.parentId }).from(categories)
