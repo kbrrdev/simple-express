@@ -309,11 +309,28 @@ export async function previewOrder(
       : null,
     couponError,
     shippingCents: pricing.shippingCents,
+    ...freeShippingProgress(pricing),
     vatableCents: pricing.totalCents - pricing.taxCents,
     taxCents: pricing.taxCents,
     totalCents: pricing.totalCents,
     taxRatePercent: pricing.rate / 100,
     pricesIncludeTax: pricing.pricesIncludeTax,
+  };
+}
+
+/** Tells the storefront how much more earns free shipping, after every discount. */
+function freeShippingProgress(pricing: ReturnType<typeof priceOrder>) {
+  const minCents = env.FREE_SHIPPING_MIN_CENTS ?? null;
+  const spentCents = pricing.subtotalCents - pricing.promotionDiscountCents - pricing.discountCents;
+
+  return {
+    freeShippingMinCents: minCents,
+    freeShippingRemainingCents:
+      minCents === null
+        ? null
+        : pricing.shippingCents === 0
+          ? 0
+          : Math.max(minCents - spentCents, 0),
   };
 }
 

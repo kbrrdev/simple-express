@@ -52,6 +52,13 @@ const listParameters = [
     in: 'query',
     schema: { type: 'string', enum: ['newest', 'name'], default: 'newest' },
   },
+  {
+    name: 'onSale',
+    in: 'query',
+    description:
+      'Only products a current sale covers, directly or through their category. Only true is accepted.',
+    schema: { type: 'boolean', enum: [true] },
+  },
 ];
 
 const badRequest = { $ref: '#/components/responses/BadRequest' };

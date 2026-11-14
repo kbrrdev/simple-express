@@ -8,6 +8,7 @@ export interface ListProductsQuery {
   search?: string;
   categoryId?: string;
   sort: 'newest' | 'name';
+  onSale?: true;
   active?: boolean;
 }
 
@@ -63,6 +64,7 @@ export const listProductsQuery = Joi.object<ListProductsQuery>({
   search: Joi.string().trim().min(1).max(255),
   categoryId: Joi.string().uuid(),
   sort: Joi.string().valid('newest', 'name').default('newest'),
+  onSale: Joi.boolean().valid(true),
 });
 
 export const listAdminProductsQuery = listProductsQuery.keys({

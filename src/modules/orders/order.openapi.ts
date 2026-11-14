@@ -455,6 +455,8 @@ export const orderSchemas = {
       'discountCents',
       'coupon',
       'couponError',
+      'freeShippingMinCents',
+      'freeShippingRemainingCents',
       'shippingCents',
       'vatableCents',
       'taxCents',
@@ -491,6 +493,17 @@ export const orderSchemas = {
             description: 'True when the discount applied itself, without a code',
           },
         },
+      },
+      freeShippingMinCents: {
+        type: ['integer', 'null'],
+        description: 'The subtotal after discounts that ships free, or null when there is none',
+        example: 150000,
+      },
+      freeShippingRemainingCents: {
+        type: ['integer', 'null'],
+        description:
+          'How much more to spend for free shipping: 0 once shipping is free, or null when there is none',
+        example: 25000,
       },
       couponError: {
         ...nullableString,
