@@ -185,7 +185,7 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Changing `parent_id` moves the whole subtree. Moves into the category's own subtree, or past three levels, are rejected.
 - Changes take an advisory lock and run one at a time, so that two moves cannot form a loop. Stores have few categories, so they are read whole for these checks and for `/api/categories/tree`.
 - A category cannot be deleted while it has subcategories or products.
-- `icon` names an icon from the frontend's icon set, so the backend only checks its format. Frontends show it when it is set, and otherwise the image.
+- `icon` names an icon from the frontend's icon set, so the backend only checks its format. Frontends show the image when it is set, and otherwise the icon.
 
 ## Coupons
 
