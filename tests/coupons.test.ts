@@ -560,6 +560,33 @@ describe('free shipping over an amount', () => {
     expect(order).toMatchObject({ shippingCents: 0, totalCents: 180000 });
   });
 
+  it('tells the storefront how much more earns free shipping', async () => {
+    const remaining = async (items: object[], body: object = {}) => {
+      const data = (await preview(items, body)).body.data;
+      return [data.freeShippingMinCents, data.freeShippingRemainingCents, data.shippingCents];
+    };
+
+    expect(await remaining([{ variantId: shirt, quantity: 1 }])).toEqual([null, null, shipping]);
+
+    env.FREE_SHIPPING_MIN_CENTS = 150000;
+    await createCoupon({ code: 'LESS600', discountType: 'fixed', discountValue: 60000 });
+    await createCoupon({ code: 'FREESHIP', discountType: 'free_shipping' });
+    const both = [
+      { variantId: shirt, quantity: 1 },
+      { variantId: cap, quantity: 1 },
+    ];
+
+    expect(await remaining([{ variantId: shirt, quantity: 1 }])).toEqual([150000, 50000, shipping]);
+    expect(await remaining(both)).toEqual([150000, 0, 0]);
+    // The coupon wins, even though it leaves 1,400 and brings shipping back.
+    expect(await remaining([{ variantId: shirt, quantity: 2 }], { couponCode: 'LESS600' })).toEqual(
+      [150000, 10000, shipping],
+    );
+    expect(
+      await remaining([{ variantId: shirt, quantity: 1 }], { couponCode: 'FREESHIP' }),
+    ).toEqual([150000, 0, 0]);
+  });
+
   it('says when a coupon does not lower the total', async () => {
     env.FREE_SHIPPING_MIN_CENTS = 150000;
     await createCoupon({ code: 'FREESHIP', discountType: 'free_shipping' });

@@ -42,9 +42,10 @@ export interface SalePrice {
 }
 
 /** The price each variant sells at now, using the sale that gives the lowest price. */
-export async function findSalePrices(database: Database, variants: PricedVariant[]) {
+/** Sales running now that still have units left at the sale price. */
+function findCurrentSales(database: Database) {
   const now = new Date();
-  const current = await database
+  return database
     .select()
     .from(sales)
     .where(
@@ -55,6 +56,24 @@ export async function findSalePrices(database: Database, variants: PricedVariant
         or(isNull(sales.stockCap), lt(sales.soldCount, sales.stockCap)),
       ),
     );
+}
+
+/** The products and categories that current sales cover, for listing what is on sale. */
+export async function findOnSaleTargets() {
+  const current = await findCurrentSales(db);
+  const targets = await findTargets(
+    db,
+    current.map((sale) => sale.id),
+  );
+
+  return {
+    productIds: targets.productIds.map((row) => row.productId),
+    categoryIds: targets.categoryIds.map((row) => row.categoryId),
+  };
+}
+
+export async function findSalePrices(database: Database, variants: PricedVariant[]) {
+  const current = await findCurrentSales(database);
 
   const targets = await findTargets(
     database,

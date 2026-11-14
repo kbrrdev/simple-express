@@ -423,6 +423,8 @@ A sale takes a percentage or a fixed amount off chosen products, or off whole ca
 - When a product is in more than one sale, shoppers get the lowest price.
 - `stockCap` limits how many units sell at the sale price, across all its products. Once they are sold, prices go back to normal, and cancelled orders give their units back. A cart only gets the sale price when all its units of that sale fit under the cap.
 
+`GET /api/products?onSale=true` lists only products a current sale covers, for a sale section on the home page. It combines with the other filters.
+
 Shoppers see sales through the prices they already use. Public product routes, the cart, and order previews return the sale price as `priceCents` or `unitPriceCents`, with `compareAtPriceCents` for showing the old price struck through, and `saleEndsAt` for a countdown. Admin product routes return the list price, which is what admins edit. Order items keep `listPriceCents`, the price before any sale.
 
 ## Promotions
@@ -641,12 +643,12 @@ No payment provider is connected. To add one, such as Stripe:
 
 Set these in `.env`:
 
-| Variable                  | Default | Description                                                                        |
-| ------------------------- | ------- | ---------------------------------------------------------------------------------- |
-| `TAX_RATE_PERCENT`        | `12`    | Tax rate. Use `0` to charge none, and decimals such as `7.5` are allowed           |
-| `PRICES_INCLUDE_TAX`      | `true`  | `true` means prices contain tax, and `false` adds it on top                        |
-| `SHIPPING_FEE_CENTS`      | `10000` | Flat shipping fee                                                                  |
-| `FREE_SHIPPING_MIN_CENTS` | empty   | Orders at least this much after discounts ship free. Empty always charges shipping |
+| Variable                  | Default | Description                                                                                                                                                                      |
+| ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAX_RATE_PERCENT`        | `12`    | Tax rate. Use `0` to charge none, and decimals such as `7.5` are allowed                                                                                                         |
+| `PRICES_INCLUDE_TAX`      | `true`  | `true` means prices contain tax, and `false` adds it on top                                                                                                                      |
+| `SHIPPING_FEE_CENTS`      | `10000` | Flat shipping fee                                                                                                                                                                |
+| `FREE_SHIPPING_MIN_CENTS` | empty   | Orders at least this much after discounts ship free. Empty always charges shipping. The order preview returns it with `freeShippingRemainingCents`, for an "add ₱X more" message |
 
 Tax applies to items and shipping. Orders show `vatableCents`, `taxCents`, and `totalCents`, and keep the rate and fee they were placed with. This is an order summary, not an official invoice.
 

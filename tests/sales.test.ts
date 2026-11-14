@@ -238,6 +238,55 @@ describe('prices', () => {
   });
 });
 
+describe('listing products on sale', () => {
+  const onSale = async (query: object = {}) => {
+    const response = await api()
+      .get('/api/products')
+      .query({ onSale: true, sort: 'name', ...query })
+      .expect(200);
+    return {
+      names: response.body.data.map((product: { name: string }) => product.name),
+      total: response.body.meta.total,
+    };
+  };
+
+  it('is empty when nothing is on sale', async () => {
+    expect(await onSale()).toEqual({ names: [], total: 0 });
+  });
+
+  it('lists products a sale covers directly or through a category', async () => {
+    await createSale({ productIds: [shirtId] });
+    expect((await onSale()).names).toEqual(['Classic T-Shirt']);
+
+    await createSale({ categoryIds: [shirtsId] });
+    expect((await onSale()).names).toEqual(['Classic T-Shirt']);
+
+    await createSale({ categoryIds: [parentId] });
+    expect(await onSale()).toEqual({ names: ['Cap', 'Classic T-Shirt'], total: 2 });
+  });
+
+  it('leaves out ended, inactive, and sold out sales', async () => {
+    await createSale({ productIds: [shirtId], endsAt: new Date(Date.now() - hour).toISOString() });
+    await createSale({ productIds: [shirtId], isActive: false });
+    const capped = await createSale({ productIds: [capId], stockCap: 2 });
+    await db.update(sales).set({ soldCount: 2 }).where(eq(sales.id, capped.id));
+
+    expect((await onSale()).names).toEqual([]);
+  });
+
+  it('combines with search, category, and paging', async () => {
+    await createSale({ categoryIds: [parentId] });
+
+    expect((await onSale({ search: 'cap' })).names).toEqual(['Cap']);
+    expect((await onSale({ categoryId: shirtsId })).names).toEqual(['Classic T-Shirt']);
+    expect(await onSale({ limit: 1 })).toEqual({ names: ['Cap'], total: 2 });
+  });
+
+  it('only accepts true', async () => {
+    await api().get('/api/products').query({ onSale: false }).expect(400);
+  });
+});
+
 describe('checkout', () => {
   it('charges the sale price, and keeps the list price on the order', async () => {
     await createSale({ productIds: [shirtId] });

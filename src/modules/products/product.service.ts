@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, ilike, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { AppError } from '../../lib/app-error';
 import { escapeLikePattern } from '../../lib/escape-like-pattern';
@@ -9,7 +9,7 @@ import { assets } from '../assets/asset.schema';
 import { changesBetween, recordAudit, type AuditEntry } from '../audit-logs/audit-log.service';
 import { findCategoryAndDescendantIds } from '../categories/category.service';
 import { findProductPromotions } from '../promotions/promotion.service';
-import { findSalePrices } from '../sales/sale.service';
+import { findOnSaleTargets, findSalePrices } from '../sales/sale.service';
 import {
   productImages,
   products,
@@ -55,7 +55,7 @@ const isPublic = and(
 );
 
 export async function listProducts(
-  { page, limit, search, categoryId, sort, active }: ListProductsQuery,
+  { page, limit, search, categoryId, sort, onSale, active }: ListProductsQuery,
   includeInactive = false,
 ) {
   const categoryIds = categoryId ? await findCategoryAndDescendantIds(categoryId) : undefined;
@@ -64,6 +64,7 @@ export async function listProducts(
     includeInactive && active !== undefined ? eq(products.active, active) : undefined,
     categoryIds ? inArray(products.categoryId, categoryIds) : undefined,
     search ? ilike(products.name, `%${escapeLikePattern(search)}%`) : undefined,
+    onSale ? await onSaleCondition() : undefined,
   );
   const orderBy =
     sort === 'name'
@@ -97,6 +98,17 @@ export async function listProducts(
     items: includeInactive ? results : await withSalePrices(results),
     total: totals[0]?.total ?? 0,
   };
+}
+
+/** Products a current sale covers, directly or through their category or a parent category. */
+async function onSaleCondition() {
+  const { productIds, categoryIds } = await findOnSaleTargets();
+  const covered = (await Promise.all(categoryIds.map(findCategoryAndDescendantIds))).flat();
+
+  return or(
+    productIds.length > 0 ? inArray(products.id, productIds) : sql`false`,
+    covered.length > 0 ? inArray(products.categoryId, covered) : sql`false`,
+  );
 }
 
 /** Shoppers see sale prices and promotion badges. Admins see and edit the list price. */

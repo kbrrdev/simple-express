@@ -1012,6 +1012,11 @@
                   "key": "sort",
                   "value": "newest",
                   "disabled": true
+                },
+                {
+                  "key": "onSale",
+                  "value": "",
+                  "disabled": true
                 }
               ],
               "variable": []
@@ -1100,6 +1105,11 @@
                 {
                   "key": "sort",
                   "value": "newest",
+                  "disabled": true
+                },
+                {
+                  "key": "onSale",
+                  "value": "",
                   "disabled": true
                 },
                 {
