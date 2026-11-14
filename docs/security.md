@@ -104,6 +104,8 @@ A guest could reserve large quantities without paying, then submit a fake refere
 - A guest order can have up to 10 items.
 - Guest checkout is limited to 10 requests per hour per IP address.
 
+- An unpaid order holding a capped sale or a limited coupon must be paid within an hour, so flash sales and limited coupons cannot be reserved for a day.
+
 **Remaining limitation:** someone with many IP addresses and email addresses can still hold stock, and orders with a submitted reference wait for an admin. Review `GET /api/orders/admin?paymentStatus=submitted` often.
 
 ### 14. Secrets in error logs

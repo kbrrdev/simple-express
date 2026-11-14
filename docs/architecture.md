@@ -193,7 +193,8 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - A coupon covers the whole order. Items on sale are left out, for its minimum and its discount, unless `allow_sale_items` is on.
 - `spread` splits the discount across the eligible lines in proportion to their totals, and gives rounding leftovers to the largest lines. Each line is taxed after its share, so tax and refunds stay right.
 - Checkout locks the coupon row and counts `coupon_redemptions` again, so parallel orders cannot pass `usage_limit` or `per_customer_limit`. Orders using the same coupon run in turn.
-- Guests are counted by email, ignoring case. A coupon can be closed to guests with `allow_guests`.
+- Guests are counted by email, ignoring case, and an account and guest orders with its email count together. A coupon can be closed to guests with `allow_guests`.
+- `couponLimiter` allows 60 requests with a `couponCode` per IP address every 15 minutes, so codes cannot be guessed through the preview.
 - The preview reports a coupon that cannot be used in `couponError` instead of failing. `optionalAuth` lets it read the login, and a bad token is still a `401`.
 - Cancelling an order deletes its redemption. A redemption's foreign key stops a used coupon being deleted.
 - Orders copy `coupon_code` and `discount_cents`, and each item its share, so later changes to the coupon never alter them.
@@ -248,6 +249,7 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - `markPaid` is the only way an order becomes paid, and is safe to repeat, so a future webhook can use it. It sets `paid_at`, which reports use to count payments by the day they arrived. `calculateShipping` is the only place that sets the fee.
 - Manual orders start as `awaiting_payment`, and a row in `payments` records the reference. The unique provider and reference stop a payment being counted twice.
 - Orders copy the provider, account name, account number, and QR of the `payment_methods` row they were placed with. The QR has a foreign key, so a file an unpaid order still shows cannot be deleted.
+- An unpaid order holding a capped sale or a limited coupon expires after an hour, so it cannot reserve them for the whole payment window. An order that costs nothing is marked paid at checkout.
 - `expireUnpaidOrders` runs every 5 minutes from `index.ts`. It uses `FOR UPDATE SKIP LOCKED`, so several servers can run it safely, and it skips orders with a submitted reference.
 - Guest orders have a `guest_email` and no `user_id`, and are never linked to accounts. Their links do not expire, so finished orders hide the shipping address. Their `guestToken` is the order ID with an HMAC signature, so a retry can return the same link without storing it. Changing `JWT_SECRET` invalidates these links.
 - Tax is calculated per line and on shipping. `TAX_RATE_PERCENT` and `PRICES_INCLUDE_TAX` set it, and both are saved on each order.

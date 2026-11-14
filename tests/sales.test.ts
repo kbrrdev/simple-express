@@ -7,6 +7,7 @@ import { db, pool } from '../src/db';
 import {
   auditLogs,
   categories,
+  paymentMethods,
   products,
   productVariants,
   roles,
@@ -116,7 +117,9 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.execute(sql`truncate table sales, categories, products, addresses, orders cascade`);
+  await db.execute(
+    sql`truncate table sales, categories, products, addresses, orders, payment_methods cascade`,
+  );
   await db.execute(sql`truncate table cart_items`);
 
   const [parent] = await db.insert(categories).values({ name: 'Men' }).returning();
@@ -356,6 +359,36 @@ describe('stock cap', () => {
 
     const [row] = await db.select().from(sales).where(eq(sales.id, sale.id));
     expect(row?.soldCount).toBe(1);
+  });
+
+  it('gives an unpaid order a shorter time to pay', async () => {
+    await createSale({ productIds: [shirtId], stockCap: 5 });
+    const [method] = await db
+      .insert(paymentMethods)
+      .values({ providerName: 'GCash', accountName: 'Store', accountNumber: '09170000000' })
+      .returning();
+
+    await api()
+      .post('/api/cart/items')
+      .set(bearer(customerToken))
+      .send({ variantId: shirt, quantity: 1 })
+      .expect(200);
+    const order = (
+      await api()
+        .post('/api/orders')
+        .set(bearer(customerToken))
+        .send({
+          addressId,
+          paymentMethod: method?.id,
+          expectedTotalCents: 80000 + shipping,
+          idempotencyKey: randomUUID(),
+        })
+        .expect(201)
+    ).body.data;
+    const hoursToPay = (new Date(order.paymentDueAt).getTime() - Date.now()) / hour;
+
+    expect(hoursToPay).toBeGreaterThan(0.9);
+    expect(hoursToPay).toBeLessThanOrEqual(1);
   });
 
   it('gives units back when an order is cancelled', async () => {

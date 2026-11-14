@@ -456,6 +456,8 @@ Shoppers enter a coupon code at checkout. Users with `promotions.manage` manage 
 - Items already on sale do not count towards a coupon, for its minimum or its discount, unless `allowSaleItems` is on.
 - One coupon per order, on the whole order. The discount is split across the eligible lines in proportion to their totals, and tax follows the discounted lines.
 - Cancelling an order gives the use back. A refund after delivery does not.
+- An account and guest orders with its email count as one customer for `perCustomerLimit`.
+- Previews and checkouts that send a `couponCode` are limited to 60 per IP address every 15 minutes, so codes cannot be guessed. Requests without a code are not counted.
 
 ### Automatic Discounts
 
@@ -629,6 +631,8 @@ Unpaid orders hold stock for free, so:
 - One customer or guest email can have `MAX_OPEN_UNPAID_ORDERS` unpaid orders open, 5 by default.
 - A guest order can have up to 10 items.
 - Guest checkout is limited to 10 requests per hour per IP address.
+- An unpaid order holding a capped sale or a coupon with a `usageLimit` must be paid within an hour, or `PAYMENT_WINDOW_HOURS` if that is shorter.
+- An order that costs nothing, such as with a 100% coupon and free shipping, is marked paid at checkout.
 
 ### Adding a Payment Provider
 

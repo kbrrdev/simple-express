@@ -85,9 +85,11 @@ export async function applyCoupon(
       .where(
         and(
           eq(couponRedemptions.couponId, coupon.id),
+          // An account and guest orders with its email are one customer, so neither resets the count.
+          // The subqueries name their table in plain SQL, as Drizzle leaves it out of this query.
           'userId' in customer
-            ? eq(couponRedemptions.userId, customer.userId)
-            : sql`lower(${couponRedemptions.guestEmail}) = lower(${customer.guestEmail})`,
+            ? sql`(${couponRedemptions.userId} = ${customer.userId} or lower(${couponRedemptions.guestEmail}) = (select lower(u.email) from users u where u.id = ${customer.userId}))`
+            : sql`(lower(${couponRedemptions.guestEmail}) = lower(${customer.guestEmail}) or ${couponRedemptions.userId} in (select u.id from users u where lower(u.email) = lower(${customer.guestEmail})))`,
         ),
       );
     if ((used?.total ?? 0) >= coupon.perCustomerLimit) {

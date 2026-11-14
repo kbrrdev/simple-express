@@ -179,7 +179,7 @@ export async function claimSaleStock(
   for (const { saleId, quantity } of lines) {
     if (saleId) units.set(saleId, (units.get(saleId) ?? 0) + quantity);
   }
-  if (units.size === 0) return;
+  if (units.size === 0) return false;
 
   // In ID order, so that parallel checkouts cannot deadlock on each other.
   const capped = await tx
@@ -198,6 +198,8 @@ export async function claimSaleStock(
 
     if (!claimed) throw new AppError(409, 'The order total has changed, as a sale has sold out');
   }
+
+  return capped.length > 0;
 }
 
 /** Gives a cancelled order's units back to their capped sales. */
