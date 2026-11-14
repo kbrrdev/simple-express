@@ -62,6 +62,7 @@ interface PlaceOrderInput {
   expectedTotalCents: number;
   idempotencyKey: string;
   couponCode?: string;
+  acceptTerms?: boolean;
 }
 
 const EXPIRY_BATCH_SIZE = 100;
@@ -597,6 +598,7 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       paymentAccountNumber: method?.accountNumber,
       paymentQrAssetId: method?.qrAssetId,
       paymentDueAt: method ? new Date(Date.now() + paymentWindowMs) : null,
+      termsAcceptedAt: input.acceptTerms ? new Date() : null,
       subtotalCents: pricing.subtotalCents,
       promotionDiscountCents: pricing.promotionDiscountCents,
       couponCode: result?.coupon.code,
@@ -1162,6 +1164,7 @@ function toAdminOrder(
     isGuest: row.guestEmail !== null,
     customerEmail: row.customerEmail ?? row.guestEmail,
     paymentReference: row.paymentReference,
+    termsAcceptedAt: row.termsAcceptedAt,
   };
 }
 

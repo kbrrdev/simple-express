@@ -2,7 +2,7 @@
 
 A simple and maintainable backend boilerplate built with **Express 5, TypeScript, Drizzle ORM, PostgreSQL, Joi, and Docker**.
 
-It runs a complete store API: accounts, products and variants, carts, guest and customer checkout, manual payments, addresses, uploads, and blogs.
+It runs a complete store API: accounts, products and variants, carts, guest and customer checkout, manual payments, addresses, uploads, blogs, store contact details, and pages such as terms and privacy.
 
 ## Tech Stack
 
@@ -148,12 +148,14 @@ src/
     ├── categories/
     ├── coupons/
     ├── orders/
+    ├── pages/
     ├── payment-methods/
     ├── products/
     ├── promotions/
     ├── reports/
     ├── roles/
     ├── sales/
+    ├── store-info/
     └── users/
 
 docs/
@@ -219,7 +221,7 @@ To fill an empty development database with sample data, run the migrations, then
 npm run db:seed
 ```
 
-It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, two coupons and an automatic discount, a buy X get Y and a bundle, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
+It adds a super admin, a staff account, and a customer, nested categories, products with variants and images, payment methods, blogs, banners, a sale and a flash sale, two coupons and an automatic discount, a buy X get Y and a bundle, store contact details, draft terms, privacy, returns, and shipping pages, a cart, and an order for every combination of payment type, order status, and payment status that can happen, most with several items. It needs `MAX_OPEN_UNPAID_ORDERS` to be at least 3, and the default is 5. Sessions, failed logins, and password resets are left empty, as using the API creates them. Log in with:
 
 | Email                  | Role        | Password           |
 | ---------------------- | ----------- | ------------------ |
@@ -332,6 +334,8 @@ New users are customers, with no role. Staff accounts get a role, and each role 
 | `categories.manage`      | Create, edit, and delete categories                                       |
 | `blogs.manage`           | Write blogs and read drafts                                               |
 | `banners.manage`         | Manage the storefront banners                                             |
+| `store.manage`           | Edit the store contact details, address, and social links                 |
+| `pages.manage`           | Write pages such as terms and privacy, and read drafts                    |
 | `promotions.manage`      | Manage sales, flash sales, coupons, and promotions                        |
 | `assets.manage`          | List, upload, and delete files                                            |
 | `payment_methods.manage` | Manage payment methods and see account numbers                            |
@@ -405,6 +409,38 @@ A storefront shows the mobile image on phones with a `<picture>` element, so pho
   <img src="{imageUrl}" alt="{altText}" />
 </picture>
 ```
+
+## Store Info
+
+`GET /api/store-info` is public, and returns the store's name, contact email and phone, address, business hours, and social links, for the storefront's footer and contact page. Empty fields are `null`.
+
+`PUT /api/store-info` saves the whole form, and needs `store.manage`, which the migration grants to the Admin role.
+
+- Omitted fields are cleared, so the CMS sends every field it shows.
+- `phone` is free text, so a store can list a landline or several numbers.
+- `socialLinks` holds up to 10 links, each with a `platform`, an `https://` `url`, and an optional `label`. They are shown in the order saved, and the storefront picks each icon from `platform`: `facebook`, `instagram`, `tiktok`, `youtube`, `x`, `messenger`, `viber`, `whatsapp`, `shopee`, or `lazada`.
+
+## Pages
+
+Pages hold the store's terms and conditions, privacy policy, return and shipping policies, and anything else with its own URL, such as an about page.
+
+| Endpoint                      | Description                                              |
+| ----------------------------- | -------------------------------------------------------- |
+| `GET /api/pages`              | Public. Published pages without their content, for links |
+| `GET /api/pages/:slug`        | Public. A published page, and `404` for drafts           |
+| `GET /api/pages/admin`        | Every page, including drafts                             |
+| `GET /api/pages/admin/:id`    | Any page, including drafts                               |
+| `POST /api/pages`             | Create a page                                            |
+| `PATCH /api/pages/admin/:id`  | Update a page                                            |
+| `DELETE /api/pages/admin/:id` | Delete a page                                            |
+
+- Writing pages and reading drafts need `pages.manage`, which the migration grants to the Admin role.
+- `slug` is lowercase letters, numbers, and single dashes, is unique, and cannot be `admin`.
+- Show `updatedAt` as the last updated date. The audit log keeps each change, including the text before it.
+
+### Accepting the Terms
+
+`POST /api/auth/register`, `POST /api/orders`, and `POST /api/orders/guest` take an optional `acceptTerms`. Send `true` when the customer ticks the terms box, and the time is saved in `users.terms_accepted_at` or `orders.terms_accepted_at`. Admin order responses show it as `termsAcceptedAt`. It is optional, so older clients keep working.
 
 ## Sales
 

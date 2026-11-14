@@ -273,6 +273,23 @@ describe('checkout', () => {
     });
   });
 
+  it('records when the buyer accepted the terms, for admins only', async () => {
+    await addToCart(medium, 1);
+    const accepted = await checkout(122000, { acceptTerms: true }).expect(201);
+    await addToCart(medium, 1);
+    const silent = await checkout(122000).expect(201);
+
+    expect(accepted.body.data).not.toHaveProperty('termsAcceptedAt');
+
+    const adminView = (id: string) =>
+      api().get(`/api/orders/admin/${id}`).set(bearer(adminToken)).expect(200);
+
+    expect((await adminView(accepted.body.data.id)).body.data.termsAcceptedAt).toEqual(
+      expect.any(String),
+    );
+    expect((await adminView(silent.body.data.id)).body.data.termsAcceptedAt).toBeNull();
+  });
+
   it('matches the preview total', async () => {
     await addToCart(medium, 2);
     await addToCart(large, 1);

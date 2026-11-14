@@ -584,13 +584,25 @@ export const orderSchemas = {
   },
   AdminOrder: {
     type: 'object',
-    required: [...orderRequired, 'userId', 'isGuest', 'customerEmail', 'paymentReference'],
+    required: [
+      ...orderRequired,
+      'userId',
+      'isGuest',
+      'customerEmail',
+      'paymentReference',
+      'termsAcceptedAt',
+    ],
     properties: {
       ...orderProperties,
       userId: { type: ['string', 'null'], format: 'uuid' },
       isGuest: { type: 'boolean' },
       customerEmail: { type: ['string', 'null'], format: 'email' },
       paymentReference: { type: ['string', 'null'] },
+      termsAcceptedAt: {
+        type: ['string', 'null'],
+        format: 'date-time',
+        description: 'When the buyer accepted the terms, if the client sent acceptTerms',
+      },
     },
   },
   GuestOrder: {
@@ -634,6 +646,10 @@ export const orderSchemas = {
         description: 'Optional. Fails with 409 and the reason when it cannot be used.',
         example: 'WELCOME10',
       },
+      acceptTerms: {
+        type: 'boolean',
+        description: 'Send true when the buyer ticked the terms box, to record when they agreed',
+      },
     },
   },
   SubmitPayment: {
@@ -676,6 +692,10 @@ export const orderSchemas = {
         pattern: '^[A-Za-z0-9_-]{3,32}$',
         description: 'Optional. Fails with 409 and the reason when it cannot be used.',
         example: 'WELCOME10',
+      },
+      acceptTerms: {
+        type: 'boolean',
+        description: 'Send true when the buyer ticked the terms box, to record when they agreed',
       },
     },
   },

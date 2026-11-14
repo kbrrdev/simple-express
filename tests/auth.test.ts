@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
@@ -154,6 +154,26 @@ describe('register', () => {
       'role',
       'superAdmin',
     ]);
+  });
+
+  it('records when the customer accepted the terms', async () => {
+    await api()
+      .post('/api/auth/register')
+      .send({ email: 'terms@example.com', password: 'another-password', acceptTerms: true })
+      .expect(201);
+    await api()
+      .post('/api/auth/register')
+      .send({ email: 'no-terms@example.com', password: 'another-password' })
+      .expect(201);
+
+    const rows = await db
+      .select({ email: users.email, termsAcceptedAt: users.termsAcceptedAt })
+      .from(users)
+      .where(inArray(users.email, ['terms@example.com', 'no-terms@example.com']));
+    const acceptedAt = Object.fromEntries(rows.map((row) => [row.email, row.termsAcceptedAt]));
+
+    expect(acceptedAt['terms@example.com']).toBeInstanceOf(Date);
+    expect(acceptedAt['no-terms@example.com']).toBeNull();
   });
 
   it('stores a salted hash instead of the password', async () => {

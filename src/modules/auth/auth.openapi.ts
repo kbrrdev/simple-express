@@ -270,6 +270,10 @@ export const authSchemas = {
         description: 'Common passwords are rejected',
         example: 'correct-horse-battery',
       },
+      acceptTerms: {
+        type: 'boolean',
+        description: 'Send true when the customer ticked the terms box, to record when they agreed',
+      },
     },
   },
   ChangePasswordBody: {

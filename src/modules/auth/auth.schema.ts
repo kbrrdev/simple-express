@@ -7,6 +7,8 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   // Customers have no role. Staff roles are managed by super admins.
   roleId: uuid('role_id').references(() => roles.id, { onDelete: 'restrict' }),
+  // When the customer accepted the terms on registering, if the client sent acceptTerms.
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()

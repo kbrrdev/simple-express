@@ -34,6 +34,8 @@ import {
 import { reportParameters, reportPaths, reportSchemas } from '../modules/reports/report.openapi';
 import { roleParameters, rolePaths, roleSchemas } from '../modules/roles/role.openapi';
 import { saleParameters, salePaths, saleSchemas } from '../modules/sales/sale.openapi';
+import { pageParameters, pagePaths, pageSchemas } from '../modules/pages/page.openapi';
+import { storeInfoPaths, storeInfoSchemas } from '../modules/store-info/store-info.openapi';
 import { userPaths } from '../modules/users/user.openapi';
 
 const errorContent = {
@@ -53,6 +55,8 @@ export const openApiDocument = {
     { name: 'Auth' },
     { name: 'Blogs' },
     { name: 'Banners' },
+    { name: 'Store Info' },
+    { name: 'Pages' },
     { name: 'Categories' },
     { name: 'Products' },
     { name: 'Cart' },
@@ -93,6 +97,8 @@ export const openApiDocument = {
     ...authPaths,
     ...blogPaths,
     ...bannerPaths,
+    ...storeInfoPaths,
+    ...pagePaths,
     ...categoryPaths,
     ...productPaths,
     ...cartPaths,
@@ -115,6 +121,7 @@ export const openApiDocument = {
     parameters: {
       ...blogParameters,
       ...bannerParameters,
+      ...pageParameters,
       ...categoryParameters,
       ...productParameters,
       ...cartParameters,
@@ -144,6 +151,8 @@ export const openApiDocument = {
       ...authSchemas,
       ...blogSchemas,
       ...bannerSchemas,
+      ...storeInfoSchemas,
+      ...pageSchemas,
       ...categorySchemas,
       ...productSchemas,
       ...cartSchemas,

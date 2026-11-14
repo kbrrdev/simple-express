@@ -58,6 +58,8 @@ export const orders = pgTable(
     paymentDueAt: timestamp('payment_due_at', { withTimezone: true }),
     // Set once by markPaid, so reports can count payments by the day they arrived.
     paidAt: timestamp('paid_at', { withTimezone: true }),
+    // When the buyer accepted the terms at checkout, if the client sent acceptTerms.
+    termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
     subtotalCents: bigint('subtotal_cents', { mode: 'number' }).notNull(),
     // The coupon used, copied so the order keeps it if the coupon changes.
     couponCode: varchar('coupon_code', { length: 32 }),

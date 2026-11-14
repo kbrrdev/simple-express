@@ -28,6 +28,7 @@ export interface CreateOrderBody {
   expectedTotalCents: number;
   idempotencyKey: string;
   couponCode?: string;
+  acceptTerms?: boolean;
 }
 
 export interface GuestOrderBody {
@@ -38,6 +39,7 @@ export interface GuestOrderBody {
   expectedTotalCents: number;
   idempotencyKey: string;
   couponCode?: string;
+  acceptTerms?: boolean;
 }
 
 export interface SubmitPaymentBody {
@@ -91,6 +93,7 @@ export const createOrderBody = Joi.object<CreateOrderBody>({
   expectedTotalCents: Joi.number().integer().min(0).required(),
   idempotencyKey: Joi.string().uuid().required(),
   couponCode,
+  acceptTerms: Joi.boolean(),
 });
 
 export const guestOrderBody = Joi.object<GuestOrderBody>({
@@ -111,6 +114,7 @@ export const guestOrderBody = Joi.object<GuestOrderBody>({
   expectedTotalCents: Joi.number().integer().min(0).required(),
   idempotencyKey: Joi.string().uuid().required(),
   couponCode,
+  acceptTerms: Joi.boolean(),
 });
 
 export const guestTokenParams = Joi.object({

@@ -18,7 +18,12 @@ import { recordAudit } from '../audit-logs/audit-log.service';
 import { resolvePermissions, type Permission } from '../roles/permissions';
 import { roles, SUPER_ADMIN_ROLE_ID } from '../roles/role.schema';
 import { loginAttempts, passwordResets, sessions, users } from './auth.schema';
-import type { ChangePasswordBody, RegisterBody, ResetPasswordBody } from './auth.validation';
+import type {
+  ChangePasswordBody,
+  LoginBody,
+  RegisterBody,
+  ResetPasswordBody,
+} from './auth.validation';
 
 export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const REFRESH_GRACE_PERIOD_MS = 30 * 1000;
@@ -101,11 +106,11 @@ function createAccessToken(userId: string, sessionId: string) {
   });
 }
 
-export async function register({ email, password }: RegisterBody) {
+export async function register({ email, password, acceptTerms }: RegisterBody) {
   const passwordHash = await hashPassword(password);
   const [user] = await db
     .insert(users)
-    .values({ email, passwordHash })
+    .values({ email, passwordHash, termsAcceptedAt: acceptTerms ? new Date() : null })
     .onConflictDoNothing({ target: users.email })
     .returning(publicUser);
 
@@ -151,7 +156,7 @@ async function recordFailedLogin(email: string) {
     });
 }
 
-export async function login({ email, password }: RegisterBody) {
+export async function login({ email, password }: LoginBody) {
   await assertLoginAllowed(email);
 
   const [user] = await db.select().from(users).where(eq(users.email, email));
