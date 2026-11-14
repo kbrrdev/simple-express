@@ -18,7 +18,7 @@ import {
   users,
 } from '../src/db/schema';
 import { spread } from '../src/modules/coupons/coupon.service';
-import { guestOrderLimiter } from '../src/modules/orders/order.routes';
+import { couponLimiter, guestOrderLimiter } from '../src/modules/orders/order.routes';
 
 const password = 'correct-horse-battery';
 const missingId = '00000000-0000-4000-8000-000000000000';
@@ -137,6 +137,7 @@ beforeEach(async () => {
 
   for (const key of ['127.0.0.1', '::ffff:127.0.0.1', '::1']) {
     await guestOrderLimiter.resetKey(key);
+    await couponLimiter.resetKey(key);
   }
 
   const [category] = await db.insert(categories).values({ name: 'Shirts' }).returning();
@@ -411,6 +412,24 @@ describe('limits', () => {
     expect(byEmail.body.data.couponError).toBe('You have already used this coupon');
   });
 
+  it('counts a customer and a guest with the same email together', async () => {
+    await createCoupon({});
+
+    await checkout([{ variantId: shirt, quantity: 1 }], total, 'SAVE10');
+    const asGuest = await guestCheckout('customer@example.com', total, 'SAVE10').expect(409);
+    expect(asGuest.body.error.message).toBe('You have already used this coupon');
+
+    await guestCheckout('OTHER@example.com', total, 'SAVE10').expect(201);
+    const asCustomer = await checkout(
+      [{ variantId: shirt, quantity: 1 }],
+      total,
+      'SAVE10',
+      409,
+      other,
+    );
+    expect(asCustomer.body.error.message).toBe('You have already used this coupon');
+  });
+
   it('can be closed to guests', async () => {
     await createCoupon({ allowGuests: false });
 
@@ -598,6 +617,46 @@ describe('free shipping over an amount', () => {
     expect(response.body.data).toMatchObject({
       coupon: null,
       couponError: 'This coupon does not lower your total',
+    });
+  });
+});
+
+describe('abuse', () => {
+  it('limits coupon attempts per address, without counting requests that have none', async () => {
+    const items = [{ variantId: shirt, quantity: 1 }];
+
+    for (let attempt = 0; attempt < 60; attempt++) {
+      await preview(items, { couponCode: `GUESS${attempt}` });
+    }
+
+    await api().post('/api/orders/preview').send({ items, couponCode: 'GUESS60' }).expect(429);
+    await preview(items);
+  });
+
+  it('gives an unpaid order with a limited coupon a shorter time to pay', async () => {
+    await createCoupon({ usageLimit: 100 });
+
+    const order = (
+      await guestCheckout('guest@example.com', 100000 - 10000 + shipping, 'SAVE10').expect(201)
+    ).body.data;
+    const hoursToPay = (new Date(order.paymentDueAt).getTime() - Date.now()) / hour;
+
+    expect(hoursToPay).toBeGreaterThan(0.9);
+    expect(hoursToPay).toBeLessThanOrEqual(1);
+  });
+
+  it('marks an order that costs nothing as paid, instead of waiting for a payment', async () => {
+    env.FREE_SHIPPING_MIN_CENTS = 0;
+    await createCoupon({ code: 'FREE', discountValue: 100 });
+
+    const order = (await guestCheckout('guest@example.com', 0, 'FREE').expect(201)).body.data;
+
+    expect(order).toMatchObject({
+      totalCents: 0,
+      status: 'pending',
+      paymentStatus: 'paid',
+      paymentDueAt: null,
+      payment: null,
     });
   });
 });

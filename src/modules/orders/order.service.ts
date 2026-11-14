@@ -65,6 +65,8 @@ interface PlaceOrderInput {
 }
 
 const EXPIRY_BATCH_SIZE = 100;
+// Unpaid orders hold what they bought, so ones holding capped deals expire sooner.
+const LIMITED_DEAL_PAYMENT_WINDOW_MS = 60 * 60 * 1000;
 
 /** The moves an admin can make. Anything not listed here is rejected. */
 const adminTransitions: Partial<Record<OrderStatus, OrderStatus[]>> = {
@@ -571,8 +573,13 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   }
   recordStep('Total checked');
 
-  await claimSaleStock(tx, pricedItems);
+  const claimedCappedSale = await claimSaleStock(tx, pricedItems);
   recordStep('Sale stock claimed');
+  const holdsLimitedDeal = claimedCappedSale || result?.coupon.usageLimit != null;
+  const paymentWindowMs = Math.min(
+    env.PAYMENT_WINDOW_HOURS * 60 * 60 * 1000,
+    holdsLimitedDeal ? LIMITED_DEAL_PAYMENT_WINDOW_MS : Infinity,
+  );
 
   await reduceStock(tx, items);
   recordStep('Stock reduced');
@@ -589,9 +596,7 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
       paymentAccountName: method?.accountName,
       paymentAccountNumber: method?.accountNumber,
       paymentQrAssetId: method?.qrAssetId,
-      paymentDueAt: method
-        ? new Date(Date.now() + env.PAYMENT_WINDOW_HOURS * 60 * 60 * 1000)
-        : null,
+      paymentDueAt: method ? new Date(Date.now() + paymentWindowMs) : null,
       subtotalCents: pricing.subtotalCents,
       promotionDiscountCents: pricing.promotionDiscountCents,
       couponCode: result?.coupon.code,
@@ -647,6 +652,13 @@ async function placeOrder(tx: Transaction, input: PlaceOrderInput) {
   }
 
   recordStep('Order saved');
+
+  // Nothing is owed, so there is no payment to wait for or collect.
+  if (order.totalCents === 0) {
+    await markPaid(tx, order.id);
+    const [paid] = await tx.select().from(orders).where(eq(orders.id, order.id));
+    return paid ?? order;
+  }
 
   return order;
 }

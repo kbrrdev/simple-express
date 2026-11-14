@@ -36,10 +36,33 @@ export const guestPaymentLimiter = rateLimit({
   handler: logRateLimit,
 });
 
+// Stops codes being guessed. Requests without a code, such as every cart change, are not counted.
+export const couponLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  skip: (req) => !req.body?.couponCode,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: tooManyRequests,
+  handler: logRateLimit,
+});
+
 export const orderRoutes = Router();
 
-orderRoutes.post('/preview', optionalAuth, validate('body', previewOrderBody), controller.preview);
-orderRoutes.post('/', requireAuth, validate('body', createOrderBody), controller.create);
+orderRoutes.post(
+  '/preview',
+  couponLimiter,
+  optionalAuth,
+  validate('body', previewOrderBody),
+  controller.preview,
+);
+orderRoutes.post(
+  '/',
+  requireAuth,
+  couponLimiter,
+  validate('body', createOrderBody),
+  controller.create,
+);
 orderRoutes.get('/', requireAuth, validate('query', listOrdersQuery), controller.list);
 
 orderRoutes.post(
