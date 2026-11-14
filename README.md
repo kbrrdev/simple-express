@@ -658,13 +658,14 @@ To use a courier's rates, change `calculateShipping` in `order.service.ts`, whic
 
 These endpoints feed an admin dashboard, one part each. `summary`, `sales`, and `top-products` need `reports.sales`, and `order-status` and `low-stock` need `reports.operations`.
 
-| Endpoint                        | Dashboard part   | Returns                                                                                |
-| ------------------------------- | ---------------- | -------------------------------------------------------------------------------------- |
-| `GET /api/reports/summary`      | Headline numbers | Orders, gross sales, collected, refunds, tax, shipping, discounts, average order value |
-| `GET /api/reports/sales`        | Sales chart      | Orders, gross sales, and collected per `day`, `week`, or `month`                       |
-| `GET /api/reports/top-products` | Best sellers     | Products by `quantity` or `revenue`                                                    |
-| `GET /api/reports/order-status` | Needs attention  | Orders per status, and payments to confirm, orders to confirm, and to ship             |
-| `GET /api/reports/low-stock`    | Low stock        | Variants on sale with stock at or below `threshold`, 5 by default                      |
+| Endpoint                        | Dashboard part   | Returns                                                                                         |
+| ------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------- |
+| `GET /api/reports/summary`      | Headline numbers | Orders, gross sales, collected, refunds, tax, shipping, discounts, average order value          |
+| `GET /api/reports/sales`        | Sales chart      | Every summary figure that can be charted, per `day`, `week`, or `month`                         |
+| `GET /api/reports/sales-by`     | Breakdown        | Gross sales and orders by `payment_method` or top-level `category`                              |
+| `GET /api/reports/top-products` | Best sellers     | Products by `quantity` or `revenue`, with their first image                                     |
+| `GET /api/reports/order-status` | Needs attention  | Orders per status, and payments to confirm, orders to confirm, and to ship                      |
+| `GET /api/reports/low-stock`    | Low stock        | Variants on sale with stock at or below `threshold`, 5 by default, with their options and image |
 
 Ranges take `from` and `to` as dates, such as `?from=2026-03-01&to=2026-03-31`. Both days are included, days follow Manila time, and the default is the last 30 days. `order-status` and `low-stock` show the store as it is now.
 
@@ -672,6 +673,10 @@ Ranges take `from` and `to` as dates, such as `?from=2026-03-01&to=2026-03-31`. 
 - **Collected** is payments received in the range, counted on the day they arrived. COD orders are collected on delivery.
 - **Refunded** is payments received in the range that were later refunded.
 - **Discounts** is what sales took off list prices, as `saleDiscountCents`, what promotions took off, as `promotionDiscountCents`, and what coupons took off, as `couponDiscountCents`, on gross sales. Waived shipping is not included.
+
+Add `compare=previous_period` to `summary`, `sales`, or `sales-by` to also get `previous`, the same figures for the same number of days just before `from`. The summary adds `changes`, each headline figure's percent change, or `null` when the previous value was 0. In `sales`, previous orders are moved forward by the period's length, so each previous point lines up with a current one, even by week or month.
+
+The summary also counts `customers`, the accounts and guest emails that ordered in the range, and `returningCustomers`, those who had ordered before it, with `returningCustomerRatePercent`. `newCustomers` is accounts created in the range.
 
 Reports use the amounts saved on each order, so changing the tax rate never changes past figures. If the rate changes during a range, `taxByRate` in the summary lists each rate separately.
 

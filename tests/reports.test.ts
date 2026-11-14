@@ -5,9 +5,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { app } from '../src/app';
 import { db, pool } from '../src/db';
 import {
+  assets,
   categories,
   orderItems,
   orders,
+  productImages,
   products,
   productVariants,
   SUPER_ADMIN_ROLE_ID,
@@ -25,6 +27,7 @@ let customerToken: string;
 let customerId: string;
 let shirtId: string;
 let shoesId: string;
+let clothingId: string;
 
 async function registerAndLogin(email: string) {
   await api().post('/api/auth/register').send({ email, password }).expect(201);
@@ -108,6 +111,7 @@ beforeAll(async () => {
 
   const [category] = await db.insert(categories).values({ name: 'Clothing' }).returning();
   if (!category) throw new Error('Failed to insert category');
+  clothingId = category.id;
 
   const [shirt, shoes] = await db
     .insert(products)
@@ -130,6 +134,13 @@ beforeAll(async () => {
   if (!medium || !shoe) throw new Error('Failed to insert variants');
   shirtId = medium.id;
   shoesId = shoe.id;
+
+  const [image] = await db
+    .insert(assets)
+    .values({ path: 'report-shirt.png', mimeType: 'image/png', sizeBytes: 100 })
+    .returning();
+  if (!image) throw new Error('Failed to insert asset');
+  await db.insert(productImages).values({ productId: shirt.id, assetId: image.id });
 
   // 10:00 on March 1 in Manila.
   await insertOrder({
@@ -194,7 +205,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.execute(sql`truncate table users, sessions, categories, orders cascade`);
+  await db.execute(sql`truncate table users, sessions, categories, orders, assets cascade`);
   await pool.end();
 });
 
@@ -230,6 +241,10 @@ describe('summary', () => {
       couponDiscountCents: 0,
       promotionDiscountCents: 0,
       newCustomers: 0,
+      // The only customer had ordered on February 28, before the range.
+      customers: 1,
+      returningCustomers: 1,
+      returningCustomerRatePercent: 100,
       taxByRate: [
         { ratePercent: 10, pricesIncludeTax: true, taxableCents: 27273, taxCents: 2727 },
         { ratePercent: 12, pricesIncludeTax: true, taxableCents: 26786, taxCents: 3214 },
@@ -255,6 +270,33 @@ describe('summary', () => {
     expect(response.body.data.newCustomers).toBe(1);
   });
 
+  it('compares with the same number of days just before', async () => {
+    const response = await getReport('summary', { ...march, compare: 'previous_period' }).expect(
+      200,
+    );
+    const { previous, changes } = response.body.data;
+
+    // March has 31 days, so it is compared with January 29 to February 28.
+    expect(previous).toMatchObject({
+      from: '2026-01-29',
+      to: '2026-02-28',
+      ordersPlaced: 1,
+      grossSalesCents: 8000,
+      collectedCents: 0,
+      customers: 1,
+      returningCustomers: 0,
+    });
+    expect(changes).toMatchObject({
+      ordersPlaced: 300,
+      grossSalesCents: 650,
+      averageOrderValueCents: 150,
+      collectedCents: null,
+      returningCustomers: null,
+    });
+    expect((await getReport('summary', march)).body.data).not.toHaveProperty('previous');
+    await getReport('summary', { ...march, compare: 'last_year' }).expect(400);
+  });
+
   it('rejects bad dates', async () => {
     await getReport('summary', { from: '2026-03-02', to: '2026-03-01' }).expect(400);
     await getReport('summary', { from: '2026-02-30' }).expect(400);
@@ -262,15 +304,87 @@ describe('summary', () => {
   });
 });
 
+/** A chart point, working out the figures each point derives from the others. */
+function point(
+  date: string,
+  figures: {
+    orders?: number;
+    grossSalesCents?: number;
+    itemsSold?: number;
+    collectedCents?: number;
+    refundedCents?: number;
+  },
+) {
+  const { orders = 0, grossSalesCents = 0, itemsSold = 0, collectedCents = 0 } = figures;
+  const refundedCents = figures.refundedCents ?? 0;
+
+  return {
+    date,
+    orders,
+    grossSalesCents,
+    averageOrderValueCents: orders > 0 ? Math.round(grossSalesCents / orders) : 0,
+    itemsSold,
+    discountCents: 0,
+    collectedCents,
+    refundedCents,
+    netCollectedCents: collectedCents - refundedCents,
+  };
+}
+
 describe('sales', () => {
+  it('lines up the previous period point for point', async () => {
+    const daily = await getReport('sales', {
+      from: '2026-03-01',
+      to: '2026-03-04',
+      compare: 'previous_period',
+    }).expect(200);
+
+    expect(daily.body.data.previous.from).toBe('2026-02-25');
+    expect(daily.body.data.previous.to).toBe('2026-02-28');
+    expect(daily.body.data.previous.points).toEqual([
+      point('2026-02-25', {}),
+      point('2026-02-26', {}),
+      point('2026-02-27', {}),
+      point('2026-02-28', { orders: 1, grossSalesCents: 8000, itemsSold: 1 }),
+    ]);
+
+    // A month is compared with the same number of days, so it stays one point against one.
+    const monthly = await getReport('sales', {
+      ...march,
+      interval: 'month',
+      compare: 'previous_period',
+    }).expect(200);
+
+    expect(monthly.body.data.points).toHaveLength(1);
+    expect(monthly.body.data.previous.points).toEqual([
+      point('2026-01-29', { orders: 1, grossSalesCents: 8000, itemsSold: 1 }),
+    ]);
+  });
+
   it('returns a point for every day, including empty ones', async () => {
     const response = await getReport('sales', { from: '2026-03-01', to: '2026-03-04' }).expect(200);
 
     expect(response.body.data.points).toEqual([
-      { date: '2026-03-01', orders: 1, grossSalesCents: 10000, collectedCents: 8000 },
-      { date: '2026-03-02', orders: 1, grossSalesCents: 20000, collectedCents: 20000 },
-      { date: '2026-03-03', orders: 0, grossSalesCents: 0, collectedCents: 0 },
-      { date: '2026-03-04', orders: 1, grossSalesCents: 30000, collectedCents: 30000 },
+      point('2026-03-01', {
+        orders: 1,
+        grossSalesCents: 10000,
+        itemsSold: 2,
+        collectedCents: 8000,
+      }),
+      point('2026-03-02', {
+        orders: 1,
+        grossSalesCents: 20000,
+        itemsSold: 1,
+        collectedCents: 20000,
+      }),
+      point('2026-03-03', {}),
+      point('2026-03-04', {
+        orders: 1,
+        grossSalesCents: 30000,
+        itemsSold: 1,
+        collectedCents: 30000,
+        refundedCents: 30000,
+      }),
     ]);
   });
 
@@ -282,8 +396,14 @@ describe('sales', () => {
     }).expect(200);
 
     expect(response.body.data.points).toEqual([
-      { date: '2026-02-01', orders: 1, grossSalesCents: 8000, collectedCents: 0 },
-      { date: '2026-03-01', orders: 3, grossSalesCents: 60000, collectedCents: 58000 },
+      point('2026-02-01', { orders: 1, grossSalesCents: 8000, itemsSold: 1 }),
+      point('2026-03-01', {
+        orders: 3,
+        grossSalesCents: 60000,
+        itemsSold: 4,
+        collectedCents: 58000,
+        refundedCents: 30000,
+      }),
     ]);
   });
 
@@ -316,7 +436,12 @@ describe('top products', () => {
     const response = await getReport('top-products', march).expect(200);
 
     expect(response.body.data.items).toEqual([
-      expect.objectContaining({ name: 'Classic T-Shirt', quantity: 2, revenueCents: 9000 }),
+      expect.objectContaining({
+        name: 'Classic T-Shirt',
+        quantity: 2,
+        revenueCents: 9000,
+        imageUrl: expect.stringMatching(/report-shirt\.png$/),
+      }),
       expect.objectContaining({
         name: 'Trail Runner',
         active: false,
@@ -332,6 +457,39 @@ describe('top products', () => {
     expect(response.body.data.items).toEqual([
       expect.objectContaining({ name: 'Trail Runner', revenueCents: 48000 }),
     ]);
+  });
+});
+
+describe('sales by', () => {
+  it('splits gross sales by payment method', async () => {
+    const response = await getReport('sales-by', { ...march, dimension: 'payment_method' }).expect(
+      200,
+    );
+
+    expect(response.body.data.rows).toEqual([
+      { key: 'manual', label: 'Manual', grossSalesCents: 50000, orders: 2 },
+      { key: 'cod', label: 'Cash on delivery', grossSalesCents: 10000, orders: 1 },
+    ]);
+  });
+
+  it('splits item totals by top-level category, with the previous period', async () => {
+    const response = await getReport('sales-by', {
+      ...march,
+      dimension: 'category',
+      compare: 'previous_period',
+    }).expect(200);
+
+    expect(response.body.data.rows).toEqual([
+      { key: clothingId, label: 'Clothing', grossSalesCents: 57000, orders: 3 },
+    ]);
+    expect(response.body.data.previous.rows).toEqual([
+      { key: clothingId, label: 'Clothing', grossSalesCents: 7000, orders: 1 },
+    ]);
+  });
+
+  it('needs a dimension', async () => {
+    await getReport('sales-by', march).expect(400);
+    await getReport('sales-by', { dimension: 'channel' }).expect(400);
   });
 });
 
@@ -360,7 +518,13 @@ describe('low stock', () => {
     const response = await getReport('low-stock').expect(200);
 
     expect(response.body.data).toEqual([
-      expect.objectContaining({ variantId: shirtId, option1Value: 'M', stock: 3 }),
+      expect.objectContaining({
+        variantId: shirtId,
+        option1Name: 'Size',
+        option1Value: 'M',
+        stock: 3,
+        imageUrl: expect.stringMatching(/report-shirt\.png$/),
+      }),
     ]);
     expect(response.body.meta).toEqual({ page: 1, limit: 20, total: 1 });
   });

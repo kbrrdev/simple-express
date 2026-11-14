@@ -1,18 +1,23 @@
 import type { Request, Response } from 'express';
 import * as reportService from './report.service';
 import type {
-  DateRangeQuery,
   LowStockQuery,
+  SalesByQuery,
   SalesQuery,
+  SummaryQuery,
   TopProductsQuery,
 } from './report.validation';
 
 export async function summary(req: Request, res: Response) {
-  res.json({ data: await reportService.getSummary(req.query as unknown as DateRangeQuery) });
+  res.json({ data: await reportService.getSummary(req.query as unknown as SummaryQuery) });
 }
 
 export async function sales(req: Request, res: Response) {
   res.json({ data: await reportService.getSales(req.query as unknown as SalesQuery) });
+}
+
+export async function salesBy(req: Request, res: Response) {
+  res.json({ data: await reportService.getSalesBy(req.query as unknown as SalesByQuery) });
 }
 
 export async function topProducts(req: Request, res: Response) {
