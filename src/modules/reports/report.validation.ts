@@ -5,8 +5,19 @@ export interface DateRangeQuery {
   to?: string;
 }
 
-export interface SalesQuery extends DateRangeQuery {
+/** Adds the same figures for the period just before, worked out in store time. */
+interface CompareQuery {
+  compare?: 'previous_period';
+}
+
+export type SummaryQuery = DateRangeQuery & CompareQuery;
+
+export interface SalesQuery extends DateRangeQuery, CompareQuery {
   interval: 'day' | 'week' | 'month';
+}
+
+export interface SalesByQuery extends DateRangeQuery, CompareQuery {
+  dimension: 'payment_method' | 'category';
 }
 
 export interface TopProductsQuery extends DateRangeQuery {
@@ -36,10 +47,19 @@ const dateRange = {
   to: storeDate,
 };
 
-export const dateRangeQuery = Joi.object<DateRangeQuery>(dateRange);
+const compare = Joi.string().valid('previous_period');
+
+export const summaryQuery = Joi.object<SummaryQuery>({ ...dateRange, compare });
+
+export const salesByQuery = Joi.object<SalesByQuery>({
+  ...dateRange,
+  compare,
+  dimension: Joi.string().valid('payment_method', 'category').required(),
+});
 
 export const salesQuery = Joi.object<SalesQuery>({
   ...dateRange,
+  compare,
   interval: Joi.string().valid('day', 'week', 'month').default('day'),
 });
 

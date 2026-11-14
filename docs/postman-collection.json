@@ -3140,6 +3140,11 @@
                   "key": "to",
                   "value": "",
                   "disabled": true
+                },
+                {
+                  "key": "compare",
+                  "value": "",
+                  "disabled": true
                 }
               ],
               "variable": []
@@ -3174,8 +3179,55 @@
                   "disabled": true
                 },
                 {
+                  "key": "compare",
+                  "value": "",
+                  "disabled": true
+                },
+                {
                   "key": "interval",
                   "value": "day",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Get gross sales and orders by payment method or category (needs reports.sales)",
+          "request": {
+            "method": "GET",
+            "description": "payment_method groups orders by cash on delivery or the payment provider they were placed with. category groups item totals, without shipping, by top-level category, so it does not add up to gross sales.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/sales-by",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "sales-by"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "compare",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "dimension",
+                  "value": "",
                   "disabled": true
                 }
               ],

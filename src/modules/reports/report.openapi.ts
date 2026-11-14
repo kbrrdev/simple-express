@@ -14,6 +14,7 @@ const forbidden = { $ref: '#/components/responses/Forbidden' };
 const serverError = { $ref: '#/components/responses/ServerError' };
 const from = { $ref: '#/components/parameters/ReportFrom' };
 const to = { $ref: '#/components/parameters/ReportTo' };
+const compare = { $ref: '#/components/parameters/ReportCompare' };
 
 const tags = ['Reports'];
 const security = [{ bearerAuth: [] }];
@@ -30,7 +31,7 @@ export const reportPaths = {
       description:
         'Days follow Manila time, and both dates are included. Without dates, it covers the last 30 days. Totals use the amounts saved on each order, so changing the tax rate never changes past figures.',
       security,
-      parameters: [from, to],
+      parameters: [from, to, compare],
       responses: {
         200: { description: 'The totals', content: dataContent('ReportSummary') },
         ...errors,
@@ -47,6 +48,7 @@ export const reportPaths = {
       parameters: [
         from,
         to,
+        compare,
         {
           name: 'interval',
           in: 'query',
@@ -55,6 +57,30 @@ export const reportPaths = {
       ],
       responses: {
         200: { description: 'The points', content: dataContent('ReportSales') },
+        ...errors,
+      },
+    },
+  },
+  '/api/reports/sales-by': {
+    get: {
+      tags,
+      summary: 'Get gross sales and orders by payment method or category (needs reports.sales)',
+      description:
+        'payment_method groups orders by cash on delivery or the payment provider they were placed with. category groups item totals, without shipping, by top-level category, so it does not add up to gross sales.',
+      security,
+      parameters: [
+        from,
+        to,
+        compare,
+        {
+          name: 'dimension',
+          in: 'query',
+          required: true,
+          schema: { type: 'string', enum: ['payment_method', 'category'] },
+        },
+      ],
+      responses: {
+        200: { description: 'The groups', content: dataContent('ReportSalesBy') },
         ...errors,
       },
     },
@@ -155,66 +181,166 @@ export const reportParameters = {
     description: 'Last day, in Manila time. Defaults to today.',
     schema: date,
   },
+  ReportCompare: {
+    name: 'compare',
+    in: 'query',
+    description:
+      'Adds `previous`, the same figures for the same number of days just before `from`.',
+    schema: { type: 'string', enum: ['previous_period'] },
+  },
+};
+
+const percent = (description: string) => ({
+  type: ['number', 'null'],
+  description: `${description} Null when the previous value was 0.`,
+  example: 12.5,
+});
+
+const changeFields = [
+  'ordersPlaced',
+  'grossSalesCents',
+  'averageOrderValueCents',
+  'itemsSold',
+  'collectedCents',
+  'refundedCents',
+  'netCollectedCents',
+  'discountCents',
+  'newCustomers',
+  'customers',
+  'returningCustomers',
+];
+
+const salesPoint = {
+  type: 'object',
+  required: [
+    'date',
+    'orders',
+    'grossSalesCents',
+    'averageOrderValueCents',
+    'itemsSold',
+    'discountCents',
+    'collectedCents',
+    'refundedCents',
+    'netCollectedCents',
+  ],
+  properties: {
+    date: { ...date, description: 'First day of the period' },
+    orders: { type: 'integer', description: 'Orders placed, apart from cancelled ones' },
+    grossSalesCents: { type: 'integer' },
+    averageOrderValueCents: { type: 'integer' },
+    itemsSold: { type: 'integer' },
+    discountCents: cents('Sale, promotion, and coupon discounts together'),
+    collectedCents: cents('Payments received in the period'),
+    refundedCents: cents('Payments received in the period that were later refunded'),
+    netCollectedCents: cents('Collected minus refunded'),
+  },
+};
+
+const salesByRows = {
+  type: 'array',
+  description: 'Largest gross sales first',
+  items: {
+    type: 'object',
+    required: ['key', 'label', 'grossSalesCents', 'orders'],
+    properties: {
+      key: {
+        type: 'string',
+        description: '`cod`, a payment provider, or a category id',
+        example: 'cod',
+      },
+      label: { type: 'string', example: 'Cash on delivery' },
+      grossSalesCents: { type: 'integer' },
+      orders: { type: 'integer' },
+    },
+  },
+};
+
+const summaryFigures = {
+  type: 'object',
+  required: [
+    'from',
+    'to',
+    'ordersPlaced',
+    'cancelledOrders',
+    'grossSalesCents',
+    'averageOrderValueCents',
+    'itemsSold',
+    'collectedCents',
+    'refundedCents',
+    'netCollectedCents',
+    'taxCents',
+    'shippingCents',
+    'discountCents',
+    'saleDiscountCents',
+    'couponDiscountCents',
+    'promotionDiscountCents',
+    'newCustomers',
+    'customers',
+    'returningCustomers',
+    'returningCustomerRatePercent',
+    'taxByRate',
+  ],
+  properties: {
+    from: date,
+    to: date,
+    ordersPlaced: { type: 'integer', description: 'Every order placed, including cancelled' },
+    cancelledOrders: { type: 'integer' },
+    grossSalesCents: cents('Totals of orders placed, apart from cancelled ones'),
+    averageOrderValueCents: cents('Gross sales divided by orders that were not cancelled'),
+    itemsSold: { type: 'integer' },
+    collectedCents: cents('Payments received in the range, by the day they were received'),
+    refundedCents: cents('Payments received in the range that were later refunded'),
+    netCollectedCents: cents('Collected minus refunded'),
+    taxCents: cents('Tax on gross sales'),
+    shippingCents: cents('Shipping on gross sales'),
+    discountCents: cents('Sale, promotion, and coupon discounts together'),
+    promotionDiscountCents: cents('Taken off by buy X get Y and bundle promotions, on gross sales'),
+    saleDiscountCents: cents('Taken off list prices by sales, on gross sales'),
+    couponDiscountCents: cents(
+      'Taken off by coupons, on gross sales. Waived shipping is not included.',
+    ),
+    newCustomers: { type: 'integer', description: 'Customer accounts created in the range' },
+    customers: {
+      type: 'integer',
+      description: 'Accounts and guest emails that placed an order in the range',
+    },
+    returningCustomers: {
+      type: 'integer',
+      description: 'Customers who had also ordered before the range',
+    },
+    returningCustomerRatePercent: {
+      type: 'number',
+      description: 'Returning customers as a percent of customers, to one decimal place',
+    },
+    taxByRate: {
+      type: 'array',
+      description: 'Gross sales split by the tax setting each order was placed with',
+      items: {
+        type: 'object',
+        required: ['ratePercent', 'pricesIncludeTax', 'taxableCents', 'taxCents'],
+        properties: {
+          ratePercent: { type: 'number', example: 12 },
+          pricesIncludeTax: { type: 'boolean' },
+          taxableCents: cents('Order totals without tax, including shipping'),
+          taxCents: { type: 'integer' },
+        },
+      },
+    },
+  },
 };
 
 export const reportSchemas = {
   ReportSummary: {
-    type: 'object',
-    required: [
-      'from',
-      'to',
-      'ordersPlaced',
-      'cancelledOrders',
-      'grossSalesCents',
-      'averageOrderValueCents',
-      'itemsSold',
-      'collectedCents',
-      'refundedCents',
-      'netCollectedCents',
-      'taxCents',
-      'shippingCents',
-      'discountCents',
-      'saleDiscountCents',
-      'couponDiscountCents',
-      'promotionDiscountCents',
-      'newCustomers',
-      'taxByRate',
-    ],
+    ...summaryFigures,
     properties: {
-      from: date,
-      to: date,
-      ordersPlaced: { type: 'integer', description: 'Every order placed, including cancelled' },
-      cancelledOrders: { type: 'integer' },
-      grossSalesCents: cents('Totals of orders placed, apart from cancelled ones'),
-      averageOrderValueCents: cents('Gross sales divided by orders that were not cancelled'),
-      itemsSold: { type: 'integer' },
-      collectedCents: cents('Payments received in the range, by the day they were received'),
-      refundedCents: cents('Payments received in the range that were later refunded'),
-      netCollectedCents: cents('Collected minus refunded'),
-      taxCents: cents('Tax on gross sales'),
-      shippingCents: cents('Shipping on gross sales'),
-      discountCents: cents('Sale, promotion, and coupon discounts together'),
-      promotionDiscountCents: cents(
-        'Taken off by buy X get Y and bundle promotions, on gross sales',
-      ),
-      saleDiscountCents: cents('Taken off list prices by sales, on gross sales'),
-      couponDiscountCents: cents(
-        'Taken off by coupons, on gross sales. Waived shipping is not included.',
-      ),
-      newCustomers: { type: 'integer', description: 'Customer accounts created in the range' },
-      taxByRate: {
-        type: 'array',
-        description: 'Gross sales split by the tax setting each order was placed with',
-        items: {
-          type: 'object',
-          required: ['ratePercent', 'pricesIncludeTax', 'taxableCents', 'taxCents'],
-          properties: {
-            ratePercent: { type: 'number', example: 12 },
-            pricesIncludeTax: { type: 'boolean' },
-            taxableCents: cents('Order totals without tax, including shipping'),
-            taxCents: { type: 'integer' },
-          },
-        },
+      ...summaryFigures.properties,
+      previous: { ...summaryFigures, description: 'Only with compare=previous_period' },
+      changes: {
+        type: 'object',
+        description: 'Only with compare=previous_period. Percent change from the previous period.',
+        properties: Object.fromEntries(
+          changeFields.map((field) => [field, percent('Percent change.')]),
+        ),
       },
     },
   },
@@ -225,18 +351,29 @@ export const reportSchemas = {
       from: date,
       to: date,
       interval: { type: 'string', enum: ['day', 'week', 'month'] },
-      points: {
-        type: 'array',
-        items: {
-          type: 'object',
-          required: ['date', 'orders', 'grossSalesCents', 'collectedCents'],
-          properties: {
-            date: { ...date, description: 'First day of the period' },
-            orders: { type: 'integer', description: 'Orders placed, apart from cancelled ones' },
-            grossSalesCents: { type: 'integer' },
-            collectedCents: { type: 'integer' },
-          },
-        },
+      points: { type: 'array', items: salesPoint },
+      previous: {
+        type: 'object',
+        description:
+          'Only with compare=previous_period. One point for each current point, in the same order, for a comparison line.',
+        required: ['from', 'to', 'points'],
+        properties: { from: date, to: date, points: { type: 'array', items: salesPoint } },
+      },
+    },
+  },
+  ReportSalesBy: {
+    type: 'object',
+    required: ['from', 'to', 'dimension', 'rows'],
+    properties: {
+      from: date,
+      to: date,
+      dimension: { type: 'string', enum: ['payment_method', 'category'] },
+      rows: salesByRows,
+      previous: {
+        type: 'object',
+        description: 'Only with compare=previous_period',
+        required: ['from', 'to', 'rows'],
+        properties: { from: date, to: date, rows: salesByRows },
       },
     },
   },
@@ -251,9 +388,14 @@ export const reportSchemas = {
         type: 'array',
         items: {
           type: 'object',
-          required: ['productId', 'name', 'active', 'quantity', 'revenueCents'],
+          required: ['productId', 'name', 'active', 'quantity', 'revenueCents', 'imageUrl'],
           properties: {
             productId: { type: 'string', format: 'uuid' },
+            imageUrl: {
+              type: ['string', 'null'],
+              format: 'uri',
+              description: "The product's first image",
+            },
             name: { type: 'string', description: "The product's current name" },
             active: { type: 'boolean' },
             quantity: { type: 'integer' },
@@ -301,8 +443,14 @@ export const reportSchemas = {
       'option2Name',
       'option2Value',
       'stock',
+      'imageUrl',
     ],
     properties: {
+      imageUrl: {
+        type: ['string', 'null'],
+        format: 'uri',
+        description: "The variant's image, or the product's first image",
+      },
       variantId: { type: 'string', format: 'uuid' },
       productId: { type: 'string', format: 'uuid' },
       productName: { type: 'string' },

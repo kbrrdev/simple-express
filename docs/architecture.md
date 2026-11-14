@@ -260,6 +260,8 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Days, weeks, and months follow Manila time, as the store only ships within the Philippines. Ranges include both dates and default to the last 30 days.
 - Gross sales are orders placed in the range, apart from cancelled ones. Collected counts payments by `paid_at`, and refunds against the period the payment arrived in, as no refund date is stored.
 - Orders paid before `paid_at` existed took their `updated_at` as a best guess.
+- `compare=previous_period` uses the same number of days just before the range. The sales chart moves the previous period's orders forward by that many days into the current buckets, so its points line up one for one, and the backend works out percent changes so frontends never compute figures.
+- Returning customers are found by account ID or lower-cased guest email, in plain SQL, as each buyer's earlier orders are matched by that key.
 - Reports are aggregated on each request, as a store this size needs no caching. `orders.created_at` and `orders.paid_at` are indexed for date ranges, and a daily chart covers up to 366 days.
 
 ## Audit Logs

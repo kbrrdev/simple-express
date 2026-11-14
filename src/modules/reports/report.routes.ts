@@ -2,7 +2,13 @@ import { Router } from 'express';
 import { requireAuth, requirePermission } from '../../middleware/require-auth';
 import { validate } from '../../middleware/validate';
 import * as controller from './report.controller';
-import { dateRangeQuery, lowStockQuery, salesQuery, topProductsQuery } from './report.validation';
+import {
+  lowStockQuery,
+  salesByQuery,
+  salesQuery,
+  summaryQuery,
+  topProductsQuery,
+} from './report.validation';
 
 export const reportRoutes = Router();
 
@@ -11,8 +17,9 @@ const operations = requirePermission('reports.operations');
 
 reportRoutes.use(requireAuth);
 
-reportRoutes.get('/summary', sales, validate('query', dateRangeQuery), controller.summary);
+reportRoutes.get('/summary', sales, validate('query', summaryQuery), controller.summary);
 reportRoutes.get('/sales', sales, validate('query', salesQuery), controller.sales);
+reportRoutes.get('/sales-by', sales, validate('query', salesByQuery), controller.salesBy);
 reportRoutes.get(
   '/top-products',
   sales,
