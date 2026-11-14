@@ -773,6 +773,255 @@
       ]
     },
     {
+      "name": "Store Info",
+      "item": [
+        {
+          "name": "Get the store's contact details and social links",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Empty fields are null, so the storefront can hide them.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/store-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "store-info"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Save the store info (needs store.manage)",
+          "request": {
+            "method": "PUT",
+            "description": "Saves the whole form. Omitted fields are cleared, and socialLinks is saved in the order sent.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/store-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "store-info"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Simple Store\",\n  \"email\": \"hello@example.com\",\n  \"phone\": \"(02) 8123 4567\",\n  \"line1\": \"123 Rizal Street\",\n  \"line2\": \"Unit 4B\",\n  \"barangay\": \"Poblacion\",\n  \"city\": \"Makati\",\n  \"province\": \"Metro Manila\",\n  \"postalCode\": \"1210\",\n  \"businessHours\": \"Mon to Sat, 9am to 6pm\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pages",
+      "item": [
+        {
+          "name": "List published pages, without their content",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "For footer links, in title order.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pages"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Create a page, such as terms or privacy (needs pages.manage)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pages"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"terms\",\n  \"title\": \"Terms and Conditions\",\n  \"content\": \"By using this store, you agree to...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List every page, including drafts (needs pages.manage)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pages",
+                "admin"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Get any page by id, including drafts (needs pages.manage)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages/admin/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pages",
+                "admin",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{undefined}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update a page (needs pages.manage)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages/admin/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pages",
+                "admin",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{undefined}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"terms\",\n  \"title\": \"Terms and Conditions\",\n  \"content\": \"By using this store, you agree to...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a page (needs pages.manage)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages/admin/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pages",
+                "admin",
+                ":id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{undefined}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get a published page by slug",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Drafts return 404. Show updatedAt as the last updated date.",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages/:slug",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pages",
+                ":slug"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "slug",
+                  "value": "{{slug}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Categories",
       "item": [
         {

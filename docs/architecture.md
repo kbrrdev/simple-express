@@ -108,12 +108,14 @@ Central route registration. Module routes are mounted under `/api`.
 | `/api/categories`      | Categories module             |
 | `/api/coupons`         | Coupons module                |
 | `/api/orders`          | Orders module                 |
+| `/api/pages`           | Pages module                  |
 | `/api/payment-methods` | Payment methods module        |
 | `/api/products`        | Products module               |
 | `/api/promotions`      | Promotions module             |
 | `/api/reports`         | Reports module                |
 | `/api/roles`           | Roles module                  |
 | `/api/sales`           | Sales module                  |
+| `/api/store-info`      | Store info module             |
 | `/api/users`           | Users module                  |
 
 ## Database
@@ -168,6 +170,21 @@ Published blogs are public to read, and drafts are hidden, including by direct l
 - Links must be a path starting with `/` or an `https://` link, so a banner cannot run a `javascript:` URL.
 - A store has at most 15 banners, counting inactive ones. Creates take an advisory lock, so parallel requests cannot pass the limit. The admin list returns the limit as `meta.maxBanners`.
 - Banners are deleted outright, as nothing else references them. `banners.manage` guards every change.
+
+## Store Info
+
+- `store_info` has one row, with a fixed ID like the built-in super admin role. Its migration creates the row, so reads never find it missing.
+- `PUT` saves the whole form, so omitted fields are cleared rather than kept.
+- `social_links` is a JSON list rather than its own table, as the links are few, always edited together, and nothing references them. Each `url` must be `https://`, for the same reason as banner links.
+- `store.manage` guards changes, and each change is recorded in the audit log.
+
+## Pages
+
+- `pages` holds the terms, privacy policy, and other pages with their own URL. Each has a unique `slug`.
+- Drafts are hidden from the public, including by slug. Admin reads and changes go through `/admin/:id`, so an ID and a slug never share a path, and `admin` is not a valid slug.
+- Lists leave out `content`, as they feed footer links.
+- `pages.manage` guards changes. The audit log keeps each version's text, so no separate history is stored.
+- `users.terms_accepted_at` and `orders.terms_accepted_at` record when a customer accepted the terms, if the client sends `acceptTerms`. It is optional, so older clients keep working.
 
 ## Sales
 

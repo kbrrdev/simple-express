@@ -4,9 +4,12 @@ import { commonPasswords } from './common-passwords';
 export interface RegisterBody {
   email: string;
   password: string;
+  acceptTerms?: boolean;
 }
 
-export interface LoginBody extends RegisterBody {
+export interface LoginBody {
+  email: string;
+  password: string;
   client: 'web' | 'native';
 }
 
@@ -42,6 +45,7 @@ const newPassword = Joi.string()
 export const registerBody = Joi.object<RegisterBody>({
   email,
   password: newPassword,
+  acceptTerms: Joi.boolean(),
 });
 
 export const loginBody = Joi.object<LoginBody>({

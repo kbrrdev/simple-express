@@ -22,9 +22,11 @@ import {
   submitOwnPayment,
   updateOrderStatus,
 } from '../modules/orders/order.service';
+import { createPage } from '../modules/pages/page.service';
 import { createMethod } from '../modules/payment-methods/payment-method.service';
 import { createPromotion } from '../modules/promotions/promotion.service';
 import { createSale } from '../modules/sales/sale.service';
+import { updateStoreInfo } from '../modules/store-info/store-info.service';
 import {
   addImage,
   addVariant,
@@ -309,6 +311,34 @@ async function main() {
     title: 'Holiday sale plans',
     content: 'Draft: list the products and discounts for the holiday sale.',
     author: 'Store Team',
+  });
+
+  // Drafts, so the store writes its own before they show on the storefront.
+  const legalPages = [
+    { slug: 'terms', title: 'Terms and Conditions' },
+    { slug: 'privacy', title: 'Privacy Policy' },
+    { slug: 'returns', title: 'Returns and Refunds' },
+    { slug: 'shipping', title: 'Shipping Policy' },
+  ];
+  for (const page of legalPages) {
+    await createPage({ ...page, content: `Draft: write the ${page.title.toLowerCase()} here.` });
+  }
+
+  await updateStoreInfo({
+    name: 'Sample Store',
+    email: 'hello@example.com',
+    phone: '0917 123 4567',
+    line1: '123 Rizal Street',
+    line2: null,
+    barangay: 'Poblacion',
+    city: 'Makati',
+    province: 'Metro Manila',
+    postalCode: '1210',
+    businessHours: 'Mon to Sat, 9am to 6pm',
+    socialLinks: [
+      { platform: 'facebook', url: 'https://facebook.com/example', label: null },
+      { platform: 'instagram', url: 'https://instagram.com/example', label: null },
+    ],
   });
 
   await createBanner({
