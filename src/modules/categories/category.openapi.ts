@@ -172,7 +172,8 @@ const categoryProperties = {
   icon: {
     type: 'string',
     nullable: true,
-    description: "An icon name from the frontend's icon set. Show the image if set, otherwise the icon.",
+    description:
+      "An icon name from the frontend's icon set. Show the image if set, otherwise the icon.",
     example: 'shirt',
   },
   createdAt: { type: 'string', format: 'date-time' },
